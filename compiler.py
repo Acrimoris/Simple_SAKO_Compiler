@@ -51,7 +51,6 @@ def process_math_operation(math_operation, user_functions=[]):
                     x += str(i)
                 else:
                     break
-
         x = x[::-1]
         y = ""
         for i in t[1]:
@@ -99,7 +98,7 @@ def compile(input_file, output_file, encoding=""):
     if encoding == "ASCII":
         pass
     elif encoding == "Ferranti":
-        pass
+        output_file.write("int encoding[128] = {63, -1, 59, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, 62, -1, -1, -1, 5, 6, 3, 26, 15, 11, 60, 23, 16, 1, 2, 19, -1, 21, 22, 7, 8, 25, 18, -1, -1, 10, 17, 61, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, -1, -1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, 20, -1, 24, -1}\n")
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
     output_file.write("int main() {\n")
@@ -280,7 +279,7 @@ def compile(input_file, output_file, encoding=""):
         #########
         # TEKST #
         #########
-        if start != -1 and line.find("WIERSZY") == -1:
+        if start != -1 and line.find("WIERSZY") == -1 and not inside_TABLICA:
             tek_wie = 0
             inside_TEKST = True
             start += len("TEKST")
@@ -311,7 +310,7 @@ def compile(input_file, output_file, encoding=""):
                 line = line[:-1] if len(line) > 1 else line
                 output_file.write(f'    printf("{line.strip()}");\n')
             continue
-        elif start != -1 and line.find("WIERSZY") != -1:
+        elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
             tek_wie = 0
             tek_wie = int(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", ""))
             inside_TEKST = True
@@ -320,7 +319,7 @@ def compile(input_file, output_file, encoding=""):
         #########
         # GOTOS #
         #########
-        if jump_to:
+        if jump_to and inside_TEKST == False and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "").replace("SKOCZDO", "").replace(":", "")[:4]
             if line != "NASTEPNY":
                 output_file.write(f"    goto _{line};\n")
@@ -331,7 +330,7 @@ def compile(input_file, output_file, encoding=""):
         #########################
         # GOTOS ACCORDINGLY TO X#
         #########################
-        if skocz_wedlug != -1:
+        if skocz_wedlug != -1 and inside_TEKST == False and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "").replace("SKOCZWEDLUG", "").split(":")
             t = line[1].split(",")
             variable = line[0].replace("(", "").replace(")", "")
@@ -347,7 +346,7 @@ def compile(input_file, output_file, encoding=""):
         #########
         # LOOPS #
         #########
-        if loop_c != -1:
+        if loop_c != -1 and inside_TEKST == False and not inside_TABLICA:
             line = line.replace("\n", "").replace(" ", "")
             t = loop_labels[len(loop_labels)-1][0]
             line = line.split(":")[1]
@@ -388,7 +387,7 @@ def compile(input_file, output_file, encoding=""):
         #############
         # CALKOWITE #
         #############
-        if start2 != -1:
+        if start2 != -1 and inside_TEKST == False and not inside_TABLICA:
             start2 += len("CALKOWITE:")
 
             # Skip spaces
@@ -429,7 +428,7 @@ def compile(input_file, output_file, encoding=""):
         ###################
         # List Definition #
         ###################
-        if blok_c != -1:
+        if blok_c != -1 and not inside_TABLICA:
             t = []
             t2 = ""
             line = line.replace(" ", "").replace("\n", "").replace("BLOK(", "").replace(")", "").split(":")
