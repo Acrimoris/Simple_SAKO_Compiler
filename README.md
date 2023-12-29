@@ -2,7 +2,7 @@ Simple SAKO Compiler
 ========
 
 ## What is this
-This SAKO compiler for C is very simple and basic. You can consider it as having a basic understanding of SAKO at the A1 proficiency level. It's slow, but it's Python so what would you expect?
+This is a very simple and basic SAKO to C compiler using GCC to compile C file. You can consider it as having a basic understanding of SAKO at the A1 proficiency level. It's slow, but it's Python so what would you expect? GCC needed for compilation to a binary file.
 
 ## Supported features
 - Basic mathematical operations and variable assigning
