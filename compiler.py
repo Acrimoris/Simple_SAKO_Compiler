@@ -126,7 +126,7 @@ def compile(input_file, output_file, encoding=""):
         stop = line.replace(" ", "").find("STOP")
         koniec = line.replace(" ", "").find("KONIEC")
         jump_to = re.match(match_gotos, line)
-        comment_c = line.replace(" ", "").find("K)") if line.replace(" ", "").find("K)") != -1 else line.replace(" ", "").find(":") # line.find("K)") or line.find(":")
+        comment_c = line.replace(" ", "").find("K)") if line.replace(" ", "").find("K)") != -1 else line.replace(" ", "").find(":")
         spaces = line.replace(" ", "").find("SPACJA") if line.replace(" ", "").find("SPACJA") != -1 else line.replace(" ", "").find("SPACJI")
         newlines = line.replace(" ", "").find("LINIA") if line.replace(" ", "").find("LINIA") != -1 else line.replace(" ", "").find("LINII")
         gdy_c = line.replace(" ", "").find("GDY")
@@ -143,7 +143,7 @@ def compile(input_file, output_file, encoding=""):
         ###############
         # Empty Lines #
         ###############
-        if line.replace(" ", "").replace("\n","") == "":
+        if line.replace(" ", "").replace("\n","") == "" and inside_TEKST == False and not inside_TABLICA:
             zline_zindex -= 1
             continue
 
@@ -280,7 +280,7 @@ def compile(input_file, output_file, encoding=""):
         # TEKST #
         #########
         if start != -1 and line.find("WIERSZY") == -1 and not inside_TABLICA:
-            tek_wie = 0
+            tek_wie = -1
             inside_TEKST = True
             start += len("TEKST")
 
@@ -307,19 +307,23 @@ def compile(input_file, output_file, encoding=""):
                 output_file.write(f'    printf("{line}");\n')
             else:
                 inside_TEKST = False
-                line = line[:-1] if len(line) > 1 else line
-                output_file.write(f'    printf("{line.strip()}");\n')
+                if tek_wie == -1:
+                    line = line.replace("\n", "\\n")
+                else:
+                    line = line.replace("\n", "")
+                output_file.write(f'    printf("{line}");\n')
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
             tek_wie = 0
             tek_wie = int(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", ""))
             inside_TEKST = True
+            zline_zindex -= 1
             continue
 
         #########
         # GOTOS #
         #########
-        if jump_to and inside_TEKST == False and not inside_TABLICA:
+        if jump_to and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "").replace("SKOCZDO", "").replace(":", "")[:4]
             if line != "NASTEPNY":
                 output_file.write(f"    goto _{line};\n")
@@ -327,10 +331,10 @@ def compile(input_file, output_file, encoding=""):
                 zline_zindex -= 1
             continue
 
-        #########################
-        # GOTOS ACCORDINGLY TO X#
-        #########################
-        if skocz_wedlug != -1 and inside_TEKST == False and not inside_TABLICA:
+        ##########################
+        # GOTOS ACCORDINGLY TO X #
+        ##########################
+        if skocz_wedlug != -1 and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "").replace("SKOCZWEDLUG", "").split(":")
             t = line[1].split(",")
             variable = line[0].replace("(", "").replace(")", "")
@@ -346,7 +350,7 @@ def compile(input_file, output_file, encoding=""):
         #########
         # LOOPS #
         #########
-        if loop_c != -1 and inside_TEKST == False and not inside_TABLICA:
+        if loop_c != -1 and not inside_TABLICA:
             line = line.replace("\n", "").replace(" ", "")
             t = loop_labels[len(loop_labels)-1][0]
             line = line.split(":")[1]
@@ -387,7 +391,7 @@ def compile(input_file, output_file, encoding=""):
         #############
         # CALKOWITE #
         #############
-        if start2 != -1 and inside_TEKST == False and not inside_TABLICA:
+        if start2 != -1 and not inside_TABLICA:
             start2 += len("CALKOWITE:")
 
             # Skip spaces
