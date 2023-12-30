@@ -819,7 +819,7 @@ def main():
         sys.exit(1)
 
     # Comment for debugging
-    # os.remove(tmp_output_filename)
+    os.remove(tmp_output_filename)
 
     return 0
 
