@@ -119,6 +119,7 @@ def compile(input_file, output_file, encoding=""):
     zline_zindex = 15
     for line in input_file:
         zline_zindex += 1
+        line = line.upper()
         # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         start = 1 if line.replace(" ", "").replace("\n", "").replace(":", "") == "TEKST" else -1
         start2 = line.replace(" ", "").find("CALKOWITE:")
@@ -253,7 +254,6 @@ def compile(input_file, output_file, encoding=""):
             if line != "$":
                 moved_List_DRW = False
             continue
-
 
         ##########
         # LABELS #
