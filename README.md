@@ -26,6 +26,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - E notation
 - ANY binary and octal operations
 - Multiple "to the power of" operations in one equation (my bad)
+- `JEZYK SAS` and `JEZYK SAKO` declarations
 
 ## More information
 For more information on SAKO programming language I recommend checking out [this repository](https://github.com/Acrimoris/Everything_about_SAKO).
