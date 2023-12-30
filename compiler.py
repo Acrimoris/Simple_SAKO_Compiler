@@ -134,7 +134,7 @@ def compile(input_file, output_file, encoding=""):
         drukuj_c = line.replace(" ", "").find("DRUKUJ(")
         blok_c = line.replace(" ", "").find("BLOK")
         tablica_c = line.replace(" ", "").find("TABLICA")
-        label_c = re.match(match_labels, line)
+        label_c = re.match(match_labels, line) or re.match(r"^\**\)", line)
         czytaj = line.replace(" ", "").find("CZYTAJ:")
         loop_c = line.replace(" ", "").find("POWTORZ")
         skocz_wedlug = line.replace(" ", "").find("SKOCZWEDLUG")
@@ -259,7 +259,7 @@ def compile(input_file, output_file, encoding=""):
         # LABELS #
         ##########
         if label_c:
-            t = re.search(match_labels, line)
+            t = re.search(match_labels, line) or re.search(r"^\**\)", line)
             t = t.group(0).replace(")", "")
             t2 = t.replace("*", "")
             t2 = t2[:4]
@@ -274,6 +274,7 @@ def compile(input_file, output_file, encoding=""):
                 loops += 1
                 loop_labels2.append([t.replace("*", "")[:4], zline_zindex+1])
             line = re.sub(match_labels, '', line)
+            if re.search(r"^\**\)", line): line = re.sub(r"^\**\)", '', line)
             zline_zindex += 1
 
         #########
