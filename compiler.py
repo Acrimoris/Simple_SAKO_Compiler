@@ -403,11 +403,12 @@ def compile(input_file, output_file, encoding=""):
 
             # Extract values after "CALKOWITE:"
             values = line.split(":")[1].replace(" ", "").split(",")
-            for i in values:
+            for z, i in enumerate(values):
                 if "*" not in i:
                     i = i[:4]
                 else:
                     i = "*" + i.replace("*", "")[:4]
+                    values[z] = i
             integers.extend(values)
             zline_zindex -= 1
             continue
@@ -465,13 +466,12 @@ def compile(input_file, output_file, encoding=""):
             TABLICA_numbers = line[0].split(",")
             for i in range(len(TABLICA_numbers)):
                 TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*")))
-            TABLICA_name = line[1]
+            TABLICA_name = line[1][:4]
             t = ""
             used_variables.append(TABLICA_name)
             inside_TABLICA = True
-        elif inside_TABLICA and line.replace(" ", "").replace("\n", "") != "*":
             zline_zindex -= 1
-            line = line.replace("\n", "")
+        elif inside_TABLICA and line.replace(" ", "").replace("\n", "") != "*":
             t2 = ""
             length = len(line)
             i = 0
@@ -819,7 +819,7 @@ def main():
         sys.exit(1)
 
     # Comment for debugging
-    os.remove(tmp_output_filename)
+    # os.remove(tmp_output_filename)
 
     return 0
 
