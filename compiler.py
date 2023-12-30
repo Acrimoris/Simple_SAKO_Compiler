@@ -742,6 +742,7 @@ def compile(input_file, output_file, encoding=""):
                 t = "//"
             if label2 == "NASTEPNY":
                 t2 = "//"
+            label1, label2 = label1[:4], label2[:4]
             output_file.write("    if (" + line + ") {\n")
             output_file.write(f"        {t}goto _{label1};\n")
             output_file.write("    } else {\n")
