@@ -603,12 +603,13 @@ def compile(input_file, output_file, encoding=""):
                 t = line[0].replace("*", "")
                 for z, i in enumerate(line):
                     vart = re.sub(r'\[.*?\]', '', i)
-                    if "*" in i:        # Reading values for arrays, works only for one-dimensional arrays
+                    if "*" in i:
                         is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
-                        ptr = "int*" * ("ptr" not in used_variables)
+                        is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
+                        ptr = f"{is_float2}* ptr" if "ptr" not in used_variables else "ptr"
                         if "ptr" not in used_variables: used_variables.append("ptr")
                         i = i.replace("*", "")
-                        output_file.write(f"    {ptr} ptr = (void*){i};\n")
+                        output_file.write(f"    {ptr} = (void*){i};\n")
                         output_file.write("    while (1) {\n")
                         output_file.write("        if (fgets(input, sizeof(input), stdin) == NULL) {\n")
                         output_file.write("            break;\n")
