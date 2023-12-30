@@ -121,7 +121,7 @@ def compile(input_file, output_file, encoding=""):
         zline_zindex += 1
         line = line.upper()
         # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
-        start = 1 if line.replace(" ", "").replace("\n", "").replace(":", "") == "TEKST" else -1
+        start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
         start2 = line.replace(" ", "").find("CALKOWITE:")
         start3 = line.replace(" ", "").find("=")
         stop = line.replace(" ", "").find("STOP")
