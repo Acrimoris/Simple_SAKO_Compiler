@@ -77,6 +77,29 @@ def handle_square_brackets(expression, not_replace, user_functions=[]):
         else:
             expression = expression.replace(f'{variable_name}({subexpression})', f'{variable_name}({modified_subexpression})')
 
+    square_bracket_matches = re.findall(r'\[([^]]+)\]', expression)
+    count = 0
+    result = ""
+    for z in square_bracket_matches:
+        count = 0
+        result = ""
+        for i in z:
+            if i == "(":
+                count += 1
+                result += i
+                continue
+            if i == ")":
+                count -= 1
+                result += i
+                continue
+            if i == ",":
+                if count == 0:
+                    result += "]["
+                else:
+                    result += i
+                continue
+            result += i
+        expression = expression.replace(f'{z}', f'{result}')
     return expression
 
 def compile(input_file, output_file, encoding=""):
@@ -89,12 +112,11 @@ def compile(input_file, output_file, encoding=""):
     loops_wol = 0
 
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n\n")
-    # TODO: Probably I should make controlling variable leave it's value after function finishes, but I don't know how
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }), float: ({ float sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }), float: ({ float iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }))\n")
     output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1.0f : 1.0f))\n")
     output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
-    output_file.write("#define elm(arr) (sizeof(arr) / sizeof((arr)[0]))\n\n")
+    output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n\n")
     if encoding == "ASCII":
         pass
     elif encoding == "Ferranti":
