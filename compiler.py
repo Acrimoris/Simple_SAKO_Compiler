@@ -606,8 +606,8 @@ def compile(input_file, output_file, encoding=""):
                     if "*" in i:
                         is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                         is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
-                        ptr = f"{is_float2}* ptr" if "ptr" not in used_variables else "ptr"
-                        if "ptr" not in used_variables: used_variables.append("ptr")
+                        ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
+                        if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
                         i = i.replace("*", "")
                         output_file.write(f"    {ptr} = (void*){i};\n")
                         output_file.write("    while (1) {\n")
@@ -624,8 +624,8 @@ def compile(input_file, output_file, encoding=""):
                         output_file.write("        if (isdigit(*trimmedInput) || *trimmedInput == '+' || *trimmedInput == '-') {\n")
                         output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
                         output_file.write("            while (token != NULL) {\n")
-                        output_file.write(f"                *ptr = ato{is_float}(token);\n")
-                        output_file.write("                ptr++;\n")
+                        output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                        output_file.write(f"                ptr{is_float}++;\n")
                         output_file.write("                token = strtok(NULL, \" \\n\");\n")
                         output_file.write("            }\n")
                         output_file.write("        } else {\n")
@@ -635,8 +635,8 @@ def compile(input_file, output_file, encoding=""):
                         output_file.write("            }\n")
                         output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
                         output_file.write("            while (token != NULL) {\n")
-                        output_file.write(f"                *ptr = ato{is_float}(token);\n")
-                        output_file.write("                ptr++;\n")
+                        output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                        output_file.write(f"                ptr{is_float}++;\n")
                         output_file.write("                token = strtok(NULL, \" \\n\");\n")
                         output_file.write("            }\n")
                         output_file.write("        }\n")
