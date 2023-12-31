@@ -169,6 +169,9 @@ def compile(input_file, output_file, encoding=""):
         if line.replace(" ", "").replace("\n","") == "" and inside_TEKST == False and not inside_TABLICA:
             zline_zindex -= 1
             continue
+        if line.replace(" ", "").replace("\n","").find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA:
+            zline_zindex -= 1
+            continue
 
         ############
         # COMMENTS #
@@ -802,11 +805,13 @@ def main():
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
     parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings')
+    parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
     input_filename = args.input_filename
     encoding = args.encoding
+    debug = args.debug
 
     if not os.path.isfile(input_filename):
         print("Error: Input file does not exist")
@@ -845,8 +850,8 @@ def main():
         traceback.print_exc()
         sys.exit(1)
 
-    # Comment for debugging
-    os.remove(tmp_output_filename)
+    if not debug:
+        os.remove(tmp_output_filename)
 
     return 0
 
