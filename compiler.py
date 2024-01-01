@@ -129,6 +129,7 @@ def compile(input_file, output_file, encoding=""):
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
     match_gotos = r"^\s*SKOCZ\s*DO\s*"
 
+    jezyk_SAS = False
     inside_TEKST = False
     inside_TABLICA = False
 
@@ -169,7 +170,7 @@ def compile(input_file, output_file, encoding=""):
         if line.replace(" ", "").replace("\n","") == "" and inside_TEKST == False and not inside_TABLICA:
             zline_zindex -= 1
             continue
-        if line.replace(" ", "").replace("\n","").find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA:
+        if line.replace(" ", "").replace("\n","").find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA and not line.strip().startswith("K)") and not line.strip().startswith(":"):
             zline_zindex -= 1
             continue
 
@@ -302,6 +303,19 @@ def compile(input_file, output_file, encoding=""):
             if re.search(r"^\**\)", line): line = re.sub(r"^\**\)", '', line)
             zline_zindex += 1
 
+        ############################
+        # JEZYK SAS and JEZYK SAKO #
+        ############################
+        if line.replace(" ", "").replace("\n","") == "JEZYKSAS" and inside_TEKST == False and not inside_TABLICA:
+            jezyk_SAS = True
+            output_file.write("    asm(")
+        elif line.replace(" ", "").replace("\n","") == "JEZYKSAKO" and jezyk_SAS:
+            jezyk_SAS = False
+            output_file.write("    );\n")
+        elif jezyk_SAS:
+            line = line.replace("\n", "")
+            output_file.write(f'        "{line}"\n')
+
         #########
         # TEKST #
         #########
@@ -399,18 +413,18 @@ def compile(input_file, output_file, encoding=""):
                         break
             # print(loop_labels2)
             if variable not in used_variables: used_variables.append(variable)
-            output_file.write("    if (fmod(" + str(variable) + ", 1.0) == 0.0) {\n")
-            output_file.write("        if (" + str(variable) + " < " + str(end) + ") {\n")
-            output_file.write(f"            {variable} = {variable} + {step};\n")
-            output_file.write(f"            goto {t};\n")
-            output_file.write("        }\n")
-            output_file.write("    } else {\n")
-            output_file.write("        if (fabs(" + str(step) + "/2) < fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
-            output_file.write(f"            {variable} = {variable} + {step};\n")
-            output_file.write(f"            goto {t};\n")
-            output_file.write("        }\n")
-            output_file.write("    }\n")
-            zline_zindex += 10
+            if variable in integers:
+                output_file.write("    if (" + str(variable) + " < " + str(end) + " || " + str(variable) + " > " + str(end) + ") {\n")
+                output_file.write(f"        {variable} = {variable} + {step};\n")
+                output_file.write(f"        goto {t};\n")
+                output_file.write("    }")
+                zline_zindex += 3
+            else:
+                output_file.write("        if (fabs(" + str(step) + "/2) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
+                output_file.write(f"            {variable} = {variable} + {step};\n")
+                output_file.write(f"            goto {t};\n")
+                output_file.write("        }\n")
+                zline_zindex += 3
             del loop_labels[len(loop_labels)-1]
             continue
 
