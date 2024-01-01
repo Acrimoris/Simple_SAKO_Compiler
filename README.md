@@ -24,7 +24,6 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - Numbers of type "double"
 - E notation
 - ANY binary and octal operations
-- Multiple "to the power of" operations in one equation (my bad)
 - `JEZYK SAS` and `JEZYK SAKO` declarations
 
 ## More information
