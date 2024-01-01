@@ -30,38 +30,43 @@ def process_math_operation(math_operation, user_functions=[]):
 
     # Handle "to the power of" operations, which aren't supported as good in C
     # TODO: Make it support more than one operation of this type in equation
-    if '^' in modified_operation:
-        if modified_operation.count("^") > 1: print("There isn't support for multiple operation of \"*\"")
-        t = modified_operation.split("^")
-        x = ""
-        count = 0
-        for i in reversed(t[0]):
-            if str(i) == ")":
-                x += str(i)
-                count += 1
-                continue
-            elif str(i) == "(":
-                count -= 1
-                x += str(i)
-                continue
-            if str(i) not in operations_list:
-                x += str(i)
+    if "^" in modified_operation:
+        pattern = re.compile(r'(\w+|\w+\([^)]*\)|\w+\[[^\]]*\])\^(\w+)')
+        while '^' in modified_operation:
+            modified_operation = re.sub(pattern, r'pow(\1, \2)', modified_operation)
+        t = []
+        t2 = []
+        for i in range(len(modified_operation)):
+            if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "(":
+                count = 1
+                t.append(i)
+                for z in range(i+2, len(modified_operation)):
+                    if modified_operation[z] == "(":
+                        count += 1
+                    elif modified_operation[z] == ")":
+                        count -= 1
+                    if count == 0:
+                        t2.append(z)
+                        break
+            if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "[":
+                count = 1
+                t.append(i)
+                for z in range(i+2, len(modified_operation)):
+                    if modified_operation[z] == "[":
+                        count += 1
+                    elif modified_operation[z] == "]":
+                        count -= 1
+                    if count == 0:
+                        t2.append(z+1)
+                        break
+        for i in range(len(t)):
+            if t[i] > t2[i]:
+                modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+                modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
             else:
-                if count != 0:
-                    x += str(i)
-                else:
-                    break
-        x = x[::-1]
-        y = ""
-        for i in t[1]:
-            if i not in operations_list:
-                y += str(i)
-            else:
-                if y in not_replace:
-                    y += str(i)
-                else:
-                    break
-        modified_operation = modified_operation.replace(f"{x}^{y}", f"pow({x},{y})")
+                modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
+                modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
     #print(modified_operation)
     return modified_operation
@@ -313,8 +318,7 @@ def compile(input_file, output_file, encoding=""):
             jezyk_SAS = False
             output_file.write("    );\n")
         elif jezyk_SAS:
-            line = line.replace("\n", "")
-            output_file.write(f'        "{line}"\n')
+            output_file.write(f'        {line}')
 
         #########
         # TEKST #
@@ -355,7 +359,7 @@ def compile(input_file, output_file, encoding=""):
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
             tek_wie = 0
-            tek_wie = int(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", ""))
+            tek_wie = int(eval(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")))
             inside_TEKST = True
             zline_zindex -= 1
             continue
