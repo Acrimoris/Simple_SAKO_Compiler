@@ -129,7 +129,7 @@ def compile(input_file, output_file, encoding=""):
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
     output_file.write("int main() {\n")
-    output_file.write("    int i; char input[100];\n")
+    output_file.write("    char input[100];\n")
 
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
     match_gotos = r"^\s*SKOCZ\s*DO\s*"
@@ -418,7 +418,7 @@ def compile(input_file, output_file, encoding=""):
             # print(loop_labels2)
             if variable not in used_variables: used_variables.append(variable)
             if variable in integers:
-                output_file.write("    if (" + str(variable) + " < " + str(end) + " || " + str(variable) + " > " + str(end) + ") {\n")
+                output_file.write("    if (" + str(variable) + " != " + str(end) + ") {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {t};\n")
                 output_file.write("    }")
@@ -629,9 +629,9 @@ def compile(input_file, output_file, encoding=""):
                 output_file.write("    } else {\n")
                 # TODO: Make DRUKUJ real numbers more accurate to SAKO
                 if "." in line[0]:
-                    output_file.write(f"        printf(\"%{line}+1{is_float}\", {i});\n")
+                    output_file.write(f"        printf(\"%{line}{is_float}\", {i});\n")
                 else:
-                    output_file.write(f"        printf(\"%{line}+1{is_float}\", {i});\n")
+                    output_file.write(f"        printf(\"%{line}{is_float}\", {i});\n")
                 output_file.write("    }\n")
                 zline_zindex += 5
             zline_zindex -= 1
@@ -822,14 +822,18 @@ def main():
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
-    parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings')
+    parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings.')
     parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
+    parser.add_argument('-Wall', '--all-warnings', action='store_true', help='Turn on -Wall flag while compiling using GCC.')
+    parser.add_argument('-nc', '--no-compiling', action='store_true', help='Turn off compiling C code using GCC.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
     input_filename = args.input_filename
     encoding = args.encoding
     debug = args.debug
+    wall_b = args.all_warnings
+    nc = args.no_compiling
 
     if not os.path.isfile(input_filename):
         print("Error: Input file does not exist")
@@ -859,16 +863,18 @@ def main():
             file.seek(0)  # Move the file pointer to the beginning
             file.writelines(lines)
 
-        # Compile the generated C code into an executable
-        compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant -o {output_filename}"
-        subprocess.run(compile_command, shell=True, check=True)
+        if not nc:
+            # Compile the generated C code into an executable
+            wall = "-Wall" * wall_b
+            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {wall} -o {output_filename}"
+            subprocess.run(compile_command, shell=True, check=True)
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         sys.exit(1)
 
-    if not debug:
+    if not debug and not nc:
         os.remove(tmp_output_filename)
 
     return 0
