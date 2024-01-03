@@ -108,14 +108,18 @@ def handle_square_brackets(expression, not_replace, user_functions=[]):
     return expression
 
 def compile(input_file, output_file, encoding=""):
+    # Define global variables
     global loop_labels2
     global loops
+
+    # Define basic variables
     integers = []
     loop_labels = []
     used_variables = []
     user_functions = []
     loops_wol = 0
 
+    # Add necessary C lines
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n\n")
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }), float: ({ float sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }), float: ({ float iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }))\n")
@@ -123,17 +127,19 @@ def compile(input_file, output_file, encoding=""):
     output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n\n")
     if encoding == "ASCII":
-        pass
+        output_file.write("int encoding[128] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,111,112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127};\n")
     elif encoding == "Ferranti":
-        output_file.write("int encoding[128] = {63, -1, 59, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, 62, -1, -1, -1, 5, 6, 3, 26, 15, 11, 60, 23, 16, 1, 2, 19, -1, 21, 22, 7, 8, 25, 18, -1, -1, 10, 17, 61, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, -1, -1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, 20, -1, 24, -1}\n")
+        output_file.write("int encoding[128] = {63, -1, 59, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, 62, -1, -1, -1, 5, 6, 3, 26, 15, 11, 60, 23, 16, 1, 2, 19, -1, 21, 22, 7, 8, 25, 18, -1, -1, 10, 17, 61, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, -1, -1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1,-1, -1, -1, -1, 20, -1, 24, -1};\n")
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
     output_file.write("int main() {\n")
     output_file.write("    char input[100];\n")
 
+    # Define regexes patterns
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
     match_gotos = r"^\s*SKOCZ\s*DO\s*"
 
+    # Define boolean variables
     jezyk_SAS = False
     inside_TEKST = False
     inside_TABLICA = False
@@ -146,9 +152,13 @@ def compile(input_file, output_file, encoding=""):
 
     zline_zindex = 15
     for line in input_file:
+        # Add one to index
         zline_zindex += 1
+        # Make line case insensitive
         line = line.upper()
+        # Debug line
         # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        # Check for SAKO keywords
         start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
         start2 = line.replace(" ", "").find("CALKOWITE:")
         start3 = line.replace(" ", "").find("=")
