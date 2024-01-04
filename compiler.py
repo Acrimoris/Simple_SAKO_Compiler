@@ -513,13 +513,18 @@ def compile(input_file, output_file, encoding=""):
                         if i not in t: t.append(i)
 
                 count = 0
-                for i in t:
-                    indent = "    " * (count + 1)
-                    r = "[0]" * (count)
-                    r2 = "[0]" * (count + 1)
-                    output_file.write(f"{indent}for (int {i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
-                    count += 1
-                    zline_zindex += 1
+                count2 = 0
+                t3 = []
+                for i in line:
+                    if i in t and i not in t3:
+                        indent = "    " * (count + 1)
+                        r = "[0]" * (count2)
+                        r2 = "[0]" * (count2 + 1)
+                        output_file.write(f"{indent}for (int {i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
+                        count += 1
+                        t3.append(i)
+                        zline_zindex += 1
+                    count2 += 1
 
                 for i in line:
                     vart += f"[{i}]"
@@ -634,7 +639,7 @@ def compile(input_file, output_file, encoding=""):
         ##########
         # SPACES #
         ##########
-        if spaces != -1 and count != True:
+        if spaces != -1:
             spaces = False
             line = line.replace(" ", "").replace("\n", "").replace(":", "")
             line = line.replace("SPACJA", "").replace("SPACJI", "")
