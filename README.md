@@ -7,7 +7,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 ## Supported features
 - Basic mathematical operations and variable assigning
 - Basic array implementation
-- Redefining array elements using "=" in index (Multiple value assignment) (Not fully yet)
+- Redefining array elements using "=" in index (Multiple value assignment)
 - Basic printing and reading to and from stdio
 - Labels
 - GOTO statements
