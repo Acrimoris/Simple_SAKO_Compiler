@@ -471,7 +471,69 @@ def compile(input_file, output_file, encoding=""):
         # Variables Definition #
         ########################
         if start3 != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
-            if len(line) >= 3:
+            count = 0
+            for i in line:
+                if i == "(":
+                    count += 1
+                elif i == ")":
+                    count -= 1
+                if i == "=" and count != 0:
+                    count = True
+                    break
+            if count == True:
+                line = line.replace(" ", "")
+                line = process_math_operation(line)
+                z = line.split("=")
+                z = z[len(z)-1]
+                vart = line.split("[")[0]
+                line = line.replace(f"{vart}", "").replace(f"={z}", "")
+                t = []
+                t2 = ""
+                count = 0
+                for index, i in enumerate(line):
+                    if i == "[":
+                        count += 1
+                        t2 += i
+                    elif i == "]":
+                        count -= 1
+                        t2 += i
+                    else:
+                        t2 += i
+                    if i == "]" and count == 0 and index != 0:
+                        t2 = t2[1:len(t2)-1]
+                        t.append(t2)
+                        t2 = ""
+                line = t
+
+                t = []
+                for index, i in enumerate(line):
+                    if "=" in i:
+                        i = i.replace("=", "")
+                        line[index] = i
+                        if i not in t: t.append(i)
+
+                count = 0
+                for i in t:
+                    indent = "    " * (count + 1)
+                    r = "[0]" * (count)
+                    r2 = "[0]" * (count + 1)
+                    output_file.write(f"{indent}for (int {i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
+                    count += 1
+                    zline_zindex += 1
+
+                for i in line:
+                    vart += f"[{i}]"
+
+                indent = "    " * (count + 1)
+                output_file.write(f"{indent}{vart} = {z};\n")
+
+                for i in range(count):
+                    indent = "    " * (count)
+                    output_file.write(indent + "}\n")
+                    count -= 1
+                    zline_zindex += 1
+
+            if len(line) >= 3 and count != True:
                 operations_list = "-+()*/×"
                 whole = line.replace(" ", "").split("=")
                 variable = whole[0]
@@ -572,7 +634,7 @@ def compile(input_file, output_file, encoding=""):
         ##########
         # SPACES #
         ##########
-        if spaces != -1:
+        if spaces != -1 and count != True:
             spaces = False
             line = line.replace(" ", "").replace("\n", "").replace(":", "")
             line = line.replace("SPACJA", "").replace("SPACJI", "")
