@@ -133,7 +133,7 @@ def compile(input_file, output_file, encoding=""):
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
     output_file.write("int main() {\n")
-    output_file.write("    char input[100];\n")
+    output_file.write("    char input[120];\n")
 
     # Define regexes patterns
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
@@ -200,6 +200,9 @@ def compile(input_file, output_file, encoding=""):
             elif line.startswith(":"):
                 zline_zindex -= 1
                 continue
+        if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA")) and not inside_TABLICA and not inside_TEKST:
+            zline_zindex -= 1
+            continue
 
         ###############
         # Moved lists #
@@ -327,6 +330,8 @@ def compile(input_file, output_file, encoding=""):
         elif line.replace(" ", "").replace("\n","") == "JEZYKSAKO" and jezyk_SAS:
             jezyk_SAS = False
             output_file.write("    );\n")
+        elif line.replace(" ", "").replace("\n","") == "JEZYKSAKO" and not jezyk_SAS:
+            return 29
         elif jezyk_SAS:
             output_file.write(f'        {line}')
 
@@ -395,7 +400,10 @@ def compile(input_file, output_file, encoding=""):
             output_file.write("    switch (" + variable + ") {\n")
             for i, z in enumerate(t):
                 output_file.write(f"        case {i}:\n")
-                output_file.write(f"            goto _{t[i][:4]};\n")
+                if z == "NASTEPNY":
+                    output_file.write(f"            break; //goto _NASTEPNY;\n")
+                else:
+                    output_file.write(f"            goto _{t[i][:4]};\n")
             output_file.write("    }\n")
             zline_zindex += (len(t)*2) + 1
             continue
@@ -520,7 +528,8 @@ def compile(input_file, output_file, encoding=""):
                         indent = "    " * (count + 1)
                         r = "[0]" * (count2)
                         r2 = "[0]" * (count2 + 1)
-                        output_file.write(f"{indent}for (int {i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
+                        used = "int " * (i not in used_variables)
+                        output_file.write(f"{indent}for ({used}{i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
                         count += 1
                         t3.append(i)
                         zline_zindex += 1
@@ -537,6 +546,7 @@ def compile(input_file, output_file, encoding=""):
                     output_file.write(indent + "}\n")
                     count -= 1
                     zline_zindex += 1
+                continue
 
             if len(line) >= 3 and count != True:
                 operations_list = "-+()*/×"
@@ -578,6 +588,7 @@ def compile(input_file, output_file, encoding=""):
                 else:
                     moved_List_B = True
                     break
+            continue
 
         ###########
         # TABLICA #
@@ -592,32 +603,37 @@ def compile(input_file, output_file, encoding=""):
             used_variables.append(TABLICA_name)
             inside_TABLICA = True
             zline_zindex -= 1
+            continue
         elif inside_TABLICA and line.replace(" ", "").replace("\n", "") != "*":
-            t2 = ""
-            length = len(line)
-            i = 0
-            while i < length:
-                t2 += line[i]
-                if line[i] == '+' or line[i] == '-':
+            try:
+                t2 = ""
+                length = len(line)
+                i = 0
+                while i < length:
+                    t2 += line[i]
+                    if line[i] == '+' or line[i] == '-':
+                        i += 1
+                        while i < length and line[i] == ' ':
+                            i += 1
+                        while i < length and line[i].isdigit():
+                            t2 += line[i]
+                            i += 1
+                        i -= 1
                     i += 1
-                    while i < length and line[i] == ' ':
-                        i += 1
-                    while i < length and line[i].isdigit():
-                        t2 += line[i]
-                        i += 1
-                    i -= 1
-                i += 1
-            line = t2
-            if "=" in line or ":" in line:
-                t2 = 0
-                for z, i in enumerate(line):
-                    if i == "=" or i == ":":
-                        t2 = z + 1
-                        break
-                t += f" {line[t2:]}"
-            else:
-                t += line
-            zline_zindex -= 1
+                line = t2
+                if "=" in line or ":" in line:
+                    t2 = 0
+                    for z, i in enumerate(line):
+                        if i == "=" or i == ":":
+                            t2 = z + 1
+                            break
+                    t += f" {line[t2:]}"
+                else:
+                    t += line
+                zline_zindex -= 1
+                continue
+            except Error as e:
+                return 3
         elif inside_TABLICA and line.replace(" ", "").replace("\n", "") == "*":
             if f"*{TABLICA_name}" in integers:
                 numbers_list = list(map(int, t.split()))
@@ -635,6 +651,7 @@ def compile(input_file, output_file, encoding=""):
             TABLICA_numbers = str(TABLICA_numbers).replace(",", "][")
             output_file.write(f"    {is_float} {TABLICA_name}{TABLICA_numbers} = {result};\n")
             inside_TABLICA = False
+            continue
 
         ##########
         # SPACES #
@@ -892,7 +909,8 @@ def compile(input_file, output_file, encoding=""):
                     output_file.write("}\n")
             else:
                 output_file.write("}\n")
-            break
+            return 0
+        return 2
 
 def main():
     global loops
@@ -927,7 +945,7 @@ def main():
         tmp.close()
         with open(input_filename, 'r') as input_file, open(tmp_output_filename, 'r+') as output_file:
             output_file.truncate()
-            compile(input_file, output_file, encoding)
+            result = compile(input_file, output_file, encoding)
             # print("Now only loops left!!")
         with open(tmp_output_filename, "r+") as file:
             lines = file.readlines()
@@ -940,11 +958,13 @@ def main():
             file.seek(0)  # Move the file pointer to the beginning
             file.writelines(lines)
 
-        if not nc:
+        if not nc and result == 0:
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
             compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
+        elif result != 0:
+            print(result)
 
     except Exception as e:
         import traceback
