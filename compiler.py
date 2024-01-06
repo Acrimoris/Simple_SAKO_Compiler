@@ -449,7 +449,7 @@ def compile(input_file, output_file, encoding, keys):
                 output_file.write("    }\n")
                 zline_zindex += 3
             else:
-                output_file.write("    if (fabs(" + str(step) + "/2) < fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
+                output_file.write("    if (fabs(" + str(step) + "/2.0) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {t};\n")
                 output_file.write("    }\n")
