@@ -14,6 +14,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - If statements
 - Loops
 - Some of SAKO language functions, mostly skipped functions performing operations on magnetic tapes, disc and directly on RAM
+- Keys from 0 to 35
 
 ## More notable NOT supported features
 - User defined functions
