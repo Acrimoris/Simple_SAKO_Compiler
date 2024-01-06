@@ -29,7 +29,6 @@ def process_math_operation(math_operation, user_functions=[]):
     modified_operation = handle_square_brackets(modified_operation, not_replace, user_functions)
 
     # Handle "to the power of" operations, which aren't supported as good in C
-    # TODO: Make it support more than one operation of this type in equation
     if "^" in modified_operation:
         pattern = re.compile(r'(\w+|\w+\([^)]*\)|\w+\[[^\]]*\])\^(\w+)')
         while '^' in modified_operation:
@@ -107,7 +106,7 @@ def handle_square_brackets(expression, not_replace, user_functions=[]):
         expression = expression.replace(f'{z}', f'{result}')
     return expression
 
-def compile(input_file, output_file, encoding=""):
+def compile(input_file, output_file, encoding, keys):
     # Define global variables
     global loop_labels2
     global loops
@@ -118,6 +117,7 @@ def compile(input_file, output_file, encoding=""):
     used_variables = []
     user_functions = []
     loops_wol = 0
+    last_label = "POCZ"
 
     # Add necessary C lines
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n\n")
@@ -132,6 +132,7 @@ def compile(input_file, output_file, encoding=""):
         output_file.write("int encoding[128] = {63, -1, 59, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, 62, -1, -1, -1, 5, 6, 3, 26, 15, 11, 60, 23, 16, 1, 2, 19, -1, 21, 22, 7, 8, 25, 18, -1, -1, 10, 17, 61, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, -1, -1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1,-1, -1, -1, -1, 20, -1, 24, -1};\n")
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
+    output_file.write(f"int keys[] = {keys};\n")
     output_file.write("int main() {\n")
     output_file.write("    char input[120];\n")
 
@@ -150,14 +151,16 @@ def compile(input_file, output_file, encoding=""):
     moved_List_DRW = False
     moved_List_CZW = False
 
-    zline_zindex = 15
+    zline_zindex = 16
+    error_line_index = 0
     for line in input_file:
         # Add one to index
         zline_zindex += 1
+        error_line_index += 1
         # Make line case insensitive
         line = line.upper()
         # Debug line
-        # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # Check for SAKO keywords
         start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
         start2 = line.replace(" ", "").find("CALKOWITE:")
@@ -184,9 +187,11 @@ def compile(input_file, output_file, encoding=""):
         ###############
         if line.replace(" ", "").replace("\n","") == "" and inside_TEKST == False and not inside_TABLICA:
             zline_zindex -= 1
+            error_line_index -= 1
             continue
         if line.replace(" ", "").replace("\n","").find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA and not line.strip().startswith("K)") and not line.strip().startswith(":"):
             zline_zindex -= 1
+            error_line_index -= 1
             continue
 
         ############
@@ -309,6 +314,8 @@ def compile(input_file, output_file, encoding=""):
             t2 = t2[:4]
             if t2 != "":
                 output_file.write(f"    _{t2}:\n")
+                last_label = t2
+                error_line_index = -1
             else:
                 output_file.write(f"    LX{loops_wol}:\n")
                 t = "*" * t.count("*") + f"LX{loops_wol}"
@@ -439,7 +446,7 @@ def compile(input_file, output_file, encoding=""):
                 output_file.write("    if (" + str(variable) + " != " + str(end) + ") {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {t};\n")
-                output_file.write("    }")
+                output_file.write("    }\n")
                 zline_zindex += 3
             else:
                 output_file.write("        if (fabs(" + str(step) + "/2) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
@@ -633,7 +640,7 @@ def compile(input_file, output_file, encoding=""):
                 zline_zindex -= 1
                 continue
             except Error as e:
-                return 3
+                return 3, error_line_index + 1, last_label
         elif inside_TABLICA and line.replace(" ", "").replace("\n", "") == "*":
             if f"*{TABLICA_name}" in integers:
                 numbers_list = list(map(int, t.split()))
@@ -694,6 +701,7 @@ def compile(input_file, output_file, encoding=""):
         # PRINTING VARIABLES #
         ######################
         if drukuj_c != -1:
+            # TODO: Make DRUKUJ numbers more accurate to SAKO (especially real numbers)
             if line.replace(" ", "").replace("\n", "")[-1] == "-":
                 moved_List_DR = True
             line = line.replace(" ", "").replace("\n", "").replace("DRUKUJ(", "").replace("):", ":").split(":")
@@ -721,7 +729,6 @@ def compile(input_file, output_file, encoding=""):
                 output_file.write("    if (" + i + " >= 0) {\n")
                 output_file.write(f"        printf(\" %{line}{is_float}\", {i});\n")
                 output_file.write("    } else {\n")
-                # TODO: Make DRUKUJ real numbers more accurate to SAKO
                 if "." in line[0]:
                     output_file.write(f"        printf(\"%{line}{is_float}\", {i});\n")
                 else:
@@ -809,7 +816,7 @@ def compile(input_file, output_file, encoding=""):
         # CZYTAJ WIERSZ #
         #################
         if czytaj_wiersz != -1:
-            line = line.replace(" ", "").replace("\n", "").replace("CZYTAJWIERSZ", "").replace(":", "").split(",")
+            line = line.replace(" ", "").replace("\n", "").replace("CZYTAJWIERSZ:", "").split(",")
             for i in line:
                 if f"*{i}" not in integers:
                     break
@@ -817,14 +824,13 @@ def compile(input_file, output_file, encoding=""):
                     moved_List_CZW = True
                     break
                 output_file.write(f"    fgets(input, sizeof(input), stdin);\n")
-                zline_zindex += 1
                 output_file.write("    for (int i = 0; i < strlen(input); ++i) {\n")
                 if encoding != "ASCII":
                     output_file.write(f"       {i}[i] = encoding[(int)input[i]];\n")
                 else:
                     output_file.write(f"        {i}[i] = input[i];\n")
                 output_file.write("    }\n")
-                zline_zindex += 3
+                zline_zindex += 4
             zline_zindex -= 1
             continue
 
@@ -851,10 +857,33 @@ def compile(input_file, output_file, encoding=""):
             zline_zindex -= 1
             continue
 
-        ##############
-        # IF SUPPORT #
-        ##############
+        #######################
+        # IF AND KEYS SUPPORT #
+        #######################
         if gdy_c != -1:
+            if line.replace(" ", "").startswith("GDYKLUCZ"):
+                line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
+                t, t2 = "", ""
+                label2 = line[1]
+                line = line[0]
+                line = line.split(":")
+                label1 = line[1]
+                line = line[0].replace("GDYKLUCZ", "")
+                line = process_math_operation(line)
+                if label1 == "NASTEPNY":
+                    t = "//"
+                if label2 == "NASTEPNY":
+                    t2 = "//"
+                label1, label2 = label1[:4], label2[:4]
+                line = f"keys[{line}] == 1"
+                output_file.write("    if (" + line + ") {\n")
+                output_file.write(f"        {t}goto _{label1};\n")
+                output_file.write("    } else {\n")
+                output_file.write(f"        {t2}goto _{label2};\n")
+                output_file.write("    }\n")
+                zline_zindex += 4
+                continue
+
             t, t2, mode = "", "", ""
             line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
             label2 = line[1]
@@ -862,7 +891,6 @@ def compile(input_file, output_file, encoding=""):
             line = line.split(":")
             label1 = line[1]
             line = line[0].replace("GDY", "")
-            operations_list="-+()*/×"
             if "=" in line:
                 whole = line.replace(" ", "").split("=")
                 mode = "=="
@@ -909,15 +937,27 @@ def compile(input_file, output_file, encoding=""):
                     output_file.write("}\n")
             else:
                 output_file.write("}\n")
-            return 0
-        return 2
+            break
+
+        return 2, error_line_index + 1, last_label
+
+    ##########
+    # ERRORS #
+    ##########
+    if len(loop_labels) != 0:
+        return 26, error_line_index, last_label
+
+    return 0, error_line_index, last_label
+
 
 def main():
     global loops
+    keys_on = [0] * 36
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
     parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings.')
+    parser.add_argument("-k", "--keys", nargs='+', type=int, help="Numbers of keys set to on. Values from 0 to 35.")
     parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
     parser.add_argument('-Wall', '--all-warnings', action='store_true', help='Turn on -Wall flag while compiling using GCC.')
     parser.add_argument('-nc', '--no-compiling', action='store_true', help='Turn off compiling C code using GCC.')
@@ -926,6 +966,7 @@ def main():
     args = parser.parse_args()
     input_filename = args.input_filename
     encoding = args.encoding
+    keys_list = args.keys
     debug = args.debug
     wall_b = args.all_warnings
     nc = args.no_compiling
@@ -940,12 +981,18 @@ def main():
     # Add ".tmp" extension
     tmp_output_filename = output_filename + ".tmp.c"
 
+    # Set keys to on
+    if keys_list != None:
+        for i in keys_list:
+            keys_on[i] = 1
+    keys_on = str(keys_on).replace("[", "{").replace("]", "}")
+
     try:
         tmp = open(tmp_output_filename, 'w')
         tmp.close()
         with open(input_filename, 'r') as input_file, open(tmp_output_filename, 'r+') as output_file:
             output_file.truncate()
-            result = compile(input_file, output_file, encoding)
+            result, error_index, label = compile(input_file, output_file, encoding, keys_on)
             # print("Now only loops left!!")
         with open(tmp_output_filename, "r+") as file:
             lines = file.readlines()
@@ -964,7 +1011,7 @@ def main():
             compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
         elif result != 0:
-            print(result)
+            print(f"{label} {error_index} BLAD {result} GLOW")
 
     except Exception as e:
         import traceback
