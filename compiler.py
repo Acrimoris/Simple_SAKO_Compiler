@@ -308,6 +308,7 @@ def compile(input_file, output_file, encoding, keys):
         # LABELS #
         ##########
         if label_c:
+            # TODO: Support weird loop notation, like "1A) *** *)*", or "*)*"
             t = re.search(match_labels, line) or re.search(r"^\**\)", line)
             t = t.group(0).replace(")", "")
             t2 = t.replace("*", "")
@@ -425,7 +426,7 @@ def compile(input_file, output_file, encoding, keys):
             line = line.split(":")[1]
             variable = line.split("=")[0]
             line = line.split("=")[1]
-            end = line.split(")")[1]
+            end = line.split(")", 1)[1]
             start_loop = line.split("(")[0]
             step = line.split("(")[1].split(")")[0]
             start_loop = process_math_operation(start_loop)
