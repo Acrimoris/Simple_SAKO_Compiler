@@ -449,10 +449,10 @@ def compile(input_file, output_file, encoding, keys):
                 output_file.write("    }\n")
                 zline_zindex += 3
             else:
-                output_file.write("        if (fabs(" + str(step) + "/2) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
-                output_file.write(f"            {variable} = {variable} + {step};\n")
-                output_file.write(f"            goto {t};\n")
-                output_file.write("        }\n")
+                output_file.write("    if (fabs(" + str(step) + "/2) < fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
+                output_file.write(f"        {variable} = {variable} + {step};\n")
+                output_file.write(f"        goto {t};\n")
+                output_file.write("    }\n")
                 zline_zindex += 3
             del loop_labels[len(loop_labels)-1]
             continue
@@ -979,7 +979,8 @@ def main():
     output_filename = os.path.splitext(input_filename)[0]
 
     # Add ".tmp" extension
-    tmp_output_filename = output_filename + ".tmp.c"
+    tmp_b = ".tmp" * (not nc)
+    tmp_output_filename = output_filename + f"{tmp_b}.c"
 
     # Set keys to on
     if keys_list != None:
