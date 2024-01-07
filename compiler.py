@@ -422,16 +422,43 @@ def compile(input_file, output_file, encoding, keys):
         #########
         if loop_c != -1 and not inside_TABLICA:
             line = line.replace("\n", "").replace(" ", "")
-            t = loop_labels[len(loop_labels)-1][0]
+            label1 = loop_labels[len(loop_labels)-1][0]
             line = line.split(":")[1]
             variable = line.split("=")[0]
             line = line.split("=")[1]
-            end = line.split(")", 1)[1]
-            start_loop = line.split("(")[0]
-            step = line.split("(")[1].split(")")[0]
+            operations_list = ["+", "-", "/", "×", "*"]
+            count = 0
+            t = []
+            t2 = []
+            for z, i in enumerate(line):
+                if i == "(":
+                    count += 1
+                elif i == ")":
+                    count -= 1
+                    if count == 0:
+                        t.append(z)
+            for i in reversed(t):
+                if i < len(line) - 1 and line[i+1] not in operations_list:
+                    t2.append(line[:i])
+                    t2.append(line[i:])
+            line = t2[0]
+            end = t2[1][1:]
+            count = 0
+            t = []
+            for z, i in reversed(list(enumerate(line))):
+                if i == "(":
+                    count -= 1
+                    if count < 0:
+                        t.append(z)
+                elif i == ")":
+                    count += 1
+            start_loop = line[:t[0]]
+            step = line[t[0]+1:]
+
             start_loop = process_math_operation(start_loop)
             step = process_math_operation(step)
             end = process_math_operation(end)
+
             # print(variable, start_loop, step, end)
             used =  "float" * ((variable not in integers) and (variable not in used_variables)) + "int" * (variable not in used_variables) * (variable in integers)
             if len(loop_labels2[len(loop_labels2)-1]) != 3:
@@ -446,13 +473,13 @@ def compile(input_file, output_file, encoding, keys):
             if variable in integers:
                 output_file.write("    if (" + str(variable) + " != " + str(end) + ") {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
-                output_file.write(f"        goto {t};\n")
+                output_file.write(f"        goto {label1};\n")
                 output_file.write("    }\n")
                 zline_zindex += 3
             else:
                 output_file.write("    if (fabs(" + str(step) + "/2.0) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
-                output_file.write(f"        goto {t};\n")
+                output_file.write(f"        goto {label1};\n")
                 output_file.write("    }\n")
                 zline_zindex += 3
             del loop_labels[len(loop_labels)-1]
