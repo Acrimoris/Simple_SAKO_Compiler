@@ -7,16 +7,19 @@ from functools import reduce
 
 loop_labels2 = []
 loops = 0
+array_names = []
 
 def process_math_operation(math_operation, user_functions=[]):
+    global array_names
     # atan2 is not quite the same, but for me close enough (retunrs a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM"]
     C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm"]
-    operations_list = "+-()/×*"
+    operations_list = "+-()/×⋄*"
     not_replace = SAKO_functions + user_functions
     # Replace '×' with '*' for multiplication
     math_operation = math_operation.replace('*', '^')
     math_operation = math_operation.replace('×', '*')
+    math_operation = math_operation.replace('⋄', '*')
     math_operation = math_operation.replace("\n", "")
     # Change (x) in lists to [x]
     # Replace variables with four characters
@@ -30,48 +33,100 @@ def process_math_operation(math_operation, user_functions=[]):
 
     # Handle "to the power of" operations, which aren't supported as good in C
     if "^" in modified_operation:
-        pattern = re.compile(r'(\w+|\w+\([^)]*\)|\w+\[[^\]]*\])\^(\w+)')
-        while '^' in modified_operation:
-            modified_operation = re.sub(pattern, r'pow(\1, \2)', modified_operation)
-        t = []
-        t2 = []
-        for i in range(len(modified_operation)):
-            if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "(":
-                count = 1
-                t.append(i)
-                for z in range(i+2, len(modified_operation)):
-                    if modified_operation[z] == "(":
-                        count += 1
-                    elif modified_operation[z] == ")":
-                        count -= 1
-                    if count == 0:
-                        t2.append(z)
+        if modified_operation.count("^") > 1:
+            pattern = re.compile(r'(\w+|\w+\([^)]*\)|\w+\[[^\]]*\])\^(\w+)')
+            while '^' in modified_operation:
+                modified_operation = re.sub(pattern, r'pow(\1, \2)', modified_operation)
+            t = []
+            t2 = []
+            for i in range(len(modified_operation)):
+                if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "(":
+                    count = 1
+                    t.append(i)
+                    for z in range(i+2, len(modified_operation)):
+                        if modified_operation[z] == "(":
+                            count += 1
+                        elif modified_operation[z] == ")":
+                            count -= 1
+                        if count == 0:
+                            t2.append(z)
+                            break
+                if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "[":
+                    count = 1
+                    t.append(i)
+                    for z in range(i+2, len(modified_operation)):
+                        if modified_operation[z] == "[":
+                            count += 1
+                        elif modified_operation[z] == "]":
+                            count -= 1
+                        if count == 0:
+                            t2.append(z+1)
+                            break
+            for i in range(len(t)):
+                if t[i] > t2[i]:
+                    modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+                    modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
+                else:
+                    modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
+                    modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+        else:
+            operations_list="*-+/"
+            t = modified_operation.split("^")
+            x = ""
+            count = 0
+            for i in reversed(t[0]):
+                if str(i) == ")":
+                    x += str(i)
+                    count += 1
+                    continue
+                elif str(i) == "(":
+                    count -= 1
+                    x += str(i)
+                    continue
+                if str(i) not in operations_list:
+                    x += str(i)
+                else:
+                    if count != 0:
+                        x += str(i)
+                    else:
                         break
-            if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "[":
-                count = 1
-                t.append(i)
-                for z in range(i+2, len(modified_operation)):
-                    if modified_operation[z] == "[":
-                        count += 1
-                    elif modified_operation[z] == "]":
-                        count -= 1
-                    if count == 0:
-                        t2.append(z+1)
-                        break
-        for i in range(len(t)):
-            if t[i] > t2[i]:
-                modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
-                modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
-            else:
-                modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
-                modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+            x = x[::-1]
+            y = ""
+            count = 0
+            for i in t[1]:
+                if i == "(":
+                    count += 1
+                    y += str(i)
+                    continue
+                elif i == ")":
+                    count -= 1
+                    y += str(i)
+                    continue
+                if i not in operations_list:
+                    y += str(i)
+                    continue
+                elif count != 0:
+                    y += str(i)
+                    continue
+            modified_operation = modified_operation.replace(f"{x}^{y}", f"pow({x},{y})")
 
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
+
+    for substring in array_names:
+        if modified_operation == substring:
+            modified_operation = f"*{modified_operation}"
+            break
+        index = modified_operation.find(substring)
+        while index != -1:
+            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[':
+                modified_operation = modified_operation[:index] + '*' + modified_operation[index:]
+            index = modified_operation.find(substring, index + 2)
+
     #print(modified_operation)
     return modified_operation
 
 def handle_square_brackets(expression, not_replace, user_functions=[]):
-    # Find all instances of variable_name(...) within square brackets and process them recursively
+    # Find all instances of array_name(...) within square brackets and process them recursively
     matches = re.findall(r'(\b[A-Za-z]+\b)\(([^)]+)\)', expression)
     for matching in matches:
         variable_name, subexpression = matching
@@ -110,9 +165,11 @@ def compile(input_file, output_file, encoding, keys):
     # Define global variables
     global loop_labels2
     global loops
+    global array_names
 
     # Define basic variables
     integers = []
+    array_names = []
     loop_labels = []
     used_variables = []
     user_functions = []
@@ -181,6 +238,7 @@ def compile(input_file, output_file, encoding, keys):
         skocz_wedlug = line.replace(" ", "").find("SKOCZWEDLUG")
         drukuj_wiersz = line.replace(" ", "").find("DRUKUJWIERSZ:")
         czytaj_wiersz = line.replace(" ", "").find("CZYTAJWIERSZ:")
+        strona_c = line.replace(" ", "").replace("\n", "") == "STRONA"
 
         ###############
         # Empty Lines #
@@ -382,7 +440,7 @@ def compile(input_file, output_file, encoding, keys):
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
             tek_wie = 0
-            tek_wie = int(eval(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")))
+            tek_wie = int(eval(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "").replace("*", "**").replace("×", "*")))
             inside_TEKST = True
             zline_zindex -= 1
             continue
@@ -584,15 +642,16 @@ def compile(input_file, output_file, encoding, keys):
                 continue
 
             if len(line) >= 3 and count != True:
-                operations_list = "-+()*/×"
+                is_float = ""
                 whole = line.replace(" ", "").split("=")
                 variable = whole[0]
                 variable = process_math_operation(variable)
                 operation = whole[1]
                 operation = process_math_operation(operation, user_functions)
                 vart = re.sub(r'\[.*?\]', '', variable)[:4]
-                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
-                if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
+                if variable[0] != "*":
+                    is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                    if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
                 output_file.write(f"    {is_float} {variable} = {operation};\n")
                 continue
 
@@ -607,8 +666,8 @@ def compile(input_file, output_file, encoding, keys):
             line = line[0]
             line = line.split(",")
             for i in line:
-                i = process_math_operation(i)
-                t.append(f"[{i}+1]")
+                i = str(eval(str(i.replace("*", "**").replace("×", "*")) + "+1"))
+                t.append(f"[{i}]")
             line = ""
             for i in t:
                 line += i
@@ -618,6 +677,7 @@ def compile(input_file, output_file, encoding, keys):
                     is_float = "float" * (f"*{i}" not in integers) + "int" * (f"*{i}" in integers)
                     used_variables.append(i)
                     output_file.write(f"    {is_float} {i}{line};\n")
+                    array_names.append(i)
                     if z != 0:
                         zline_zindex += 1
                 else:
@@ -636,6 +696,7 @@ def compile(input_file, output_file, encoding, keys):
             TABLICA_name = line[1][:4]
             t = ""
             used_variables.append(TABLICA_name)
+            array_names.append(TABLICA_name)
             inside_TABLICA = True
             zline_zindex -= 1
             continue
@@ -723,6 +784,13 @@ def compile(input_file, output_file, encoding, keys):
                 zline_zindex += 2
             else:
                 output_file.write("    printf(\"\\n\");\n")
+            continue
+
+        ##########
+        # STRONA #
+        ##########
+        if strona_c:
+            output_file.write("    printf(\"\");\n")
             continue
 
         ######################
@@ -888,6 +956,7 @@ def compile(input_file, output_file, encoding, keys):
         #######################
         # IF AND KEYS SUPPORT #
         #######################
+        # TODO: Add GDY NADMIAR
         if gdy_c != -1:
             if line.replace(" ", "").startswith("GDYKLUCZ"):
                 line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
@@ -1050,7 +1119,7 @@ def main():
     if not debug and not nc:
         os.remove(tmp_output_filename)
 
-    return 0
+    return 0;
 
 if __name__ == "__main__":
     main()
