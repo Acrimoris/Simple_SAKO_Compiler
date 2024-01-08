@@ -19,7 +19,6 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 ## More notable NOT supported features
 - User defined functions
 - Changing array's size using `STRUKTURA`
-- Operating on array's 0th index by not using "*"
 - `ROZDZIAL` declarations
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
 - Numbers of type "double"
