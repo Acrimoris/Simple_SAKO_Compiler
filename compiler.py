@@ -5,15 +5,11 @@ import re
 import argparse
 from functools import reduce
 
-loop_labels2 = []
-loops = 0
-array_names = []
-
 def process_math_operation(math_operation, user_functions=[]):
     global array_names
     # atan2 is not quite the same, but for me close enough (retunrs a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
-    SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm"]
+    SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "&"]
     operations_list = "+-()/×⋄*"
     not_replace = SAKO_functions + user_functions
     # Replace '×' with '*' for multiplication
@@ -178,9 +174,9 @@ def compile(input_file, output_file, encoding, keys):
 
     # Add necessary C lines
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n\n")
-    output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }), float: ({ float sum = 0; for (int X = Y; X > 0; X--) sum += Z; sum; }))\n")
-    output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }), float: ({ float iln = 1; for (int X = Y; X > 0; X--) iln = iln * Z; iln; }))\n")
-    output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1.0f : 1.0f))\n")
+    output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }), float: ({ float sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }))\n")
+    output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }), float: ({ float iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }))\n")
+    output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : 1))\n")
     output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n\n")
     if encoding == "ASCII":
@@ -219,9 +215,11 @@ def compile(input_file, output_file, encoding, keys):
         # Debug line
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # Check for SAKO keywords
+        # "start" stays, as I started with this keyword
         start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
-        start2 = line.replace(" ", "").find("CALKOWITE:")
-        start3 = line.replace(" ", "").find("=")
+        calkowite_c = line.replace(" ", "").find("CALKOWITE:")
+        decimal_operation_c = line.replace(" ", "").find("=")
+        octal_and_binary_operation_c = line.replace(" ", "").find("[")
         stop = line.replace(" ", "").find("STOP")
         koniec = line.replace(" ", "").find("KONIEC")
         jump_to = re.match(match_gotos, line)
@@ -229,6 +227,7 @@ def compile(input_file, output_file, encoding, keys):
         spaces = line.replace(" ", "").find("SPACJA") if line.replace(" ", "").find("SPACJA") != -1 else line.replace(" ", "").find("SPACJI")
         newlines = line.replace(" ", "").find("LINIA") if line.replace(" ", "").find("LINIA") != -1 else line.replace(" ", "").find("LINII")
         gdy_c = line.replace(" ", "").find("GDY")
+        gdy_inaczej_c = line.replace(" ", "").find("INACZEJ")
         drukuj_c = line.replace(" ", "").find("DRUKUJ(")
         blok_c = line.replace(" ", "").find("BLOK")
         tablica_c = line.replace(" ", "").find("TABLICA")
@@ -440,7 +439,8 @@ def compile(input_file, output_file, encoding, keys):
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
             tek_wie = 0
-            tek_wie = int(eval(line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "").replace("*", "**").replace("×", "*")))
+            line = line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")
+            tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*')))
             inside_TEKST = True
             zline_zindex -= 1
             continue
@@ -546,12 +546,12 @@ def compile(input_file, output_file, encoding, keys):
         #############
         # CALKOWITE #
         #############
-        if start2 != -1 and not inside_TABLICA:
-            start2 += len("CALKOWITE:")
+        if calkowite_c != -1 and not inside_TABLICA:
+            calkowite_c += len("CALKOWITE:")
 
             # Skip spaces
-            while start2 < len(line) and line[start2].isspace():
-                start2 += 1
+            while calkowite_c < len(line) and line[calkowite_c].isspace():
+                calkowite_c += 1
 
             # Remove the \n symbol
             line = line[:-1] if len(line) > 1 else line
@@ -571,7 +571,7 @@ def compile(input_file, output_file, encoding, keys):
         ########################
         # Variables Definition #
         ########################
-        if start3 != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
+        if decimal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
             count = 0
             for i in line:
                 if i == "(":
@@ -666,7 +666,7 @@ def compile(input_file, output_file, encoding, keys):
             line = line[0]
             line = line.split(",")
             for i in line:
-                i = str(eval(str(i.replace("*", "**").replace("×", "*")) + "+1"))
+                i = str(eval(str(i.replace("*", "**").replace("×", "*").replace('⋄', '*')) + "+1"))
                 t.append(f"[{i}]")
             line = ""
             for i in t:
@@ -692,7 +692,7 @@ def compile(input_file, output_file, encoding, keys):
             line = line.replace(" ", "").replace("\n", "").replace("TABLICA(", "").replace(")", "").split(":")
             TABLICA_numbers = line[0].split(",")
             for i in range(len(TABLICA_numbers)):
-                TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*")))
+                TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*").replace('⋄', '*')))
             TABLICA_name = line[1][:4]
             t = ""
             used_variables.append(TABLICA_name)
@@ -956,8 +956,7 @@ def compile(input_file, output_file, encoding, keys):
         #######################
         # IF AND KEYS SUPPORT #
         #######################
-        # TODO: Add GDY NADMIAR
-        if gdy_c != -1:
+        if gdy_c != -1 and gdy_inaczej_c != -1:
             if line.replace(" ", "").startswith("GDYKLUCZ"):
                 line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
                 t, t2 = "", ""
@@ -979,6 +978,18 @@ def compile(input_file, output_file, encoding, keys):
                 output_file.write(f"        {t2}goto _{label2};\n")
                 output_file.write("    }\n")
                 zline_zindex += 4
+                continue
+
+            if line.replace(" ", "").startswith("GDYBYLNADMIAR"):
+                line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
+                label2 = line[1]
+                label2 = label2[:4]
+                line = line[0]
+                line.replace("GDYBYLNADMIAR:", "")
+                label1 = line[:4]
+                t = "//" * (label2 == "NAST")
+                # There is no detection for that right now, so it's just goto
+                output_file.write(f"    {t}goto _{label2};\n")
                 continue
 
             t, t2, mode = "", "", ""
@@ -1029,7 +1040,8 @@ def compile(input_file, output_file, encoding, keys):
         ##########
         if koniec != -1:
             line = line.replace("\n", "")
-            if len(line.replace(" ", "")) > 6:
+            line = line.replace(" ", "")
+            if len(line) > 6:
                 if ":" in line:
                     output_file.write("}\n")
             else:
@@ -1048,8 +1060,13 @@ def compile(input_file, output_file, encoding, keys):
 
 
 def main():
+    # Define globals
     global loops
-    keys_on = [0] * 36
+    global array_names
+    global loop_labels2
+    loop_labels2 = []
+    loops = 0
+    array_names = []
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
@@ -1080,6 +1097,7 @@ def main():
     tmp_output_filename = output_filename + f"{tmp_b}.c"
 
     # Set keys to on
+    keys_on = [0] * 36
     if keys_list != None:
         for i in keys_list:
             keys_on[i] = 1
