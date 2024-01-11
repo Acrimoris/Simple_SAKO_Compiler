@@ -66,7 +66,7 @@ def process_math_operation(math_operation, user_functions=[]):
                     modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
                     modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
         else:
-            operations_list="*-+/"
+            operations_list="⋄*-+/"
             t = modified_operation.split("^")
             x = ""
             count = 0
@@ -108,13 +108,14 @@ def process_math_operation(math_operation, user_functions=[]):
 
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
 
+    operations_list="⋄*-+/=["
     for substring in array_names:
         if modified_operation == substring:
             modified_operation = f"*{modified_operation}"
             break
         index = modified_operation.find(substring)
         while index != -1:
-            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[':
+            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[' and modified_operation[index + len(substring)] in operations_list:
                 modified_operation = modified_operation[:index] + '*' + modified_operation[index:]
             index = modified_operation.find(substring, index + 2)
 
@@ -265,6 +266,8 @@ def compile(input_file, output_file, encoding, keys):
         if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA")) and not inside_TABLICA and not inside_TEKST:
             zline_zindex -= 1
             continue
+        if ";" in line:
+            return "Semicolon", error_line_index + 1, last_label
 
         ###############
         # Moved lists #
@@ -375,9 +378,10 @@ def compile(input_file, output_file, encoding, keys):
                 last_label = t2
                 error_line_index = -1
             else:
-                output_file.write(f"    LX{loops_wol}:\n")
+                #output_file.write(f"    LX{loops_wol}:\n")
                 t = "*" * t.count("*") + f"LX{loops_wol}"
                 loops_wol += 1
+                zline_zindex -= 1
             for _ in range(t.count("*")):
                 loop_labels.append([f"LS{loops}", zline_zindex+1])
                 loops += 1
@@ -1124,7 +1128,7 @@ def main():
         if not nc and result == 0:
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
-            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {wall} -o {output_filename}"
+            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant -Os {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
         elif result != 0:
             print(f"{label} {error_index} BLAD {result} GLOW")
