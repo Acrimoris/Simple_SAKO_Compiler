@@ -5,6 +5,16 @@ import re
 import argparse
 from functools import reduce
 
+def is_number(s):
+    try:
+        number = float(s)
+    except ValueError:
+        return ""
+    if "." in s:
+        return "float"
+    else:
+        return "int"
+
 def process_math_operation(math_operation, user_functions=[]):
     global array_names
     # atan2 is not quite the same, but for me close enough (retunrs a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
@@ -241,6 +251,8 @@ def compile(input_file, output_file, encoding, keys):
         drukuj_wiersz = line.replace(" ", "").find("DRUKUJWIERSZ:")
         czytaj_wiersz = line.replace(" ", "").find("CZYTAJWIERSZ:")
         strona_c = line.replace(" ", "").replace("\n", "") == "STRONA"
+        beben_pisz_c = line.replace(" ", "").startswith("PISZNABEBENOD")
+        beben_czytaj_c = line.replace(" ", "").startswith("CZYTAJZBEBNAOD")
 
         ###############
         # Empty Lines #
@@ -265,7 +277,7 @@ def compile(input_file, output_file, encoding, keys):
             elif line.startswith(":"):
                 zline_zindex -= 1
                 continue
-        if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA")) and not inside_TABLICA and not inside_TEKST:
+        if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA") or line.replace(" ", "").replace("\n","") == "KONIECROZDZIALU") and not inside_TABLICA and not inside_TEKST:
             zline_zindex -= 1
             continue
         if ";" in line:
@@ -1034,6 +1046,72 @@ def compile(input_file, output_file, encoding, keys):
             output_file.write(f"        {t2}goto _{label2};\n")
             output_file.write("    }\n")
             zline_zindex += 4
+            continue
+
+        #################
+        # PISZ NA BEBEN #
+        #################
+        if beben_pisz_c:
+            line = line.replace(" ", "").replace("\n", "").replace("PISZNABEBENOD", "").split(":", 1)
+            index = process_math_operation(line[0])
+            line = line[1].split(",")
+            FILE = "FILE" * ("file" not in used_variables) + ""
+            if "file" not in used_variables: used_variables.append("file")
+            output_file.write(f"    {FILE} *file = fopen(\"drum.txt\", \"r\");\n")
+            output_file.write("    if (file == NULL) {\n")
+            output_file.write("        file = fopen(\"drum.txt\", \"w\");\n")
+            output_file.write("        fclose(file);\n")
+            output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
+            output_file.write("    }\n")
+            output_file.write(f"    {FILE} *file2 = fopen(\"drum.tmp\", \"w\");\n")
+            output_file.write("    if (file != NULL) {\n")
+            output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
+            output_file.write("            fgets(input, sizeof(input), file);\n")
+            output_file.write("            if (input[0] == 0) {\n")
+            output_file.write("                fprintf(file2, \"\\n\");\n")
+            output_file.write("            } else {\n")
+            output_file.write("                fprintf(file2, input);\n")
+            output_file.write("            }\n")
+            output_file.write("        }\n")
+            for i in line:
+                if i.startswith("*"):
+                    is_float = "f" * (i not in integers) + "i" * (i in integers)
+                    is_float2 = "float" * (i not in integers) + "int" * (i in integers)
+                    is_float3 = "f" * (i not in integers) + "d" * (i in integers)
+                    ptr = f"{is_float2}* ptr{is_float}"
+                    output_file.write(f"        {ptr} = {i[1:]};\n")
+                    output_file.write(f"        for (int i = 0; i < elm({i[1:]}); ++i) {{\n")
+                    output_file.write(f"            fprintf(file2, \"%{is_float3}\\n\", *ptr{is_float});\n")
+                    output_file.write("            fgets(input, sizeof(input), file);\n")
+                    output_file.write(f"            ptr{is_float}++;\n")
+                    output_file.write("        }\n")
+                    zline_zindex += 6
+                else:
+                    i = process_math_operation(i)
+                    # Added option to write constants, not only variables :)
+                    # Just some innovation
+                    t = is_number(i)
+                    if t == "float":
+                        is_float = "f"
+                    elif t == "int":
+                        is_float = "d"
+                    else:
+                        t2 = re.sub(r'\[.*?\]', '', i)
+                        is_float = "f" * (i not in integers and f"*{t2}" not in integers) + "d" * (i in integers or f"*{t2}" in integers)
+                    output_file.write(f"        fprintf(file2, \"%{is_float}\\n\", {i});\n")
+                    output_file.write("        fgets(input, sizeof(input), file);\n")
+                    zline_zindex += 2
+            output_file.write("        while(fgets(input, sizeof(input), file) != NULL) {\n")
+            output_file.write("            fprintf(file2, input);\n")
+            output_file.write("        }\n")
+            output_file.write("        fclose(file);\n")
+            output_file.write("        fclose(file2);\n")
+            output_file.write("    } else {\n")
+            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+            output_file.write("    }\n")
+            output_file.write("    remove(\"drum.txt\");\n")
+            output_file.write("    rename(\"drum.tmp\", \"drum.txt\");\n")
+            zline_zindex += 25
             continue
 
         ########
