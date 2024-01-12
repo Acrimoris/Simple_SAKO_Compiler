@@ -108,7 +108,7 @@ def process_math_operation(math_operation, user_functions=[]):
 
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
 
-    operations_list="⋄*-+/=["
+    operations_list="⋄*-+/=[]>"
     for substring in array_names:
         if modified_operation == substring:
             modified_operation = f"*{modified_operation}"
@@ -174,7 +174,7 @@ def compile(input_file, output_file, encoding, keys):
     last_label = "POCZ"
 
     # Add necessary C lines
-    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n\n")
+    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n\n")
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }), float: ({ float sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }), float: ({ float iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }))\n")
     output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : 1))\n")
@@ -186,9 +186,11 @@ def compile(input_file, output_file, encoding, keys):
         output_file.write("int encoding[128] = {63, -1, 59, -1, -1, -1, -1, -1, -1, -1, 13, -1, -1, 30, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, 62, -1, -1, -1, 5, 6, 3, 26, 15, 11, 60, 23, 16, 1, 2, 19, -1, 21, 22, 7, 8, 25, 18, -1, -1, 10, 17, 61, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, -1, -1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1,-1, -1, -1, -1, 20, -1, 24, -1};\n")
     else:
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n")
-    output_file.write(f"int keys[] = {keys};\n")
-    output_file.write("int main() {\n")
+    output_file.write(f"int keys[] = {keys}; int opt;\n")
+    output_file.write("int main(int argc, char *argv[]) {\n")
     output_file.write("    char input[120];\n")
+    # Oneliner for getting keys
+    output_file.write("    while ((opt = getopt(argc, argv, \"k:\")) != -1) { if (opt == 'k') { char *token = strtok(optarg, \",\"); while (token != NULL) { int index = atoi(token); if (index >= 0 && index < 35) { keys[index] = 1; } token = strtok(NULL, \",\"); } } }\n")
 
     # Define regexes patterns
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
@@ -205,7 +207,7 @@ def compile(input_file, output_file, encoding, keys):
     moved_List_DRW = False
     moved_List_CZW = False
 
-    zline_zindex = 16
+    zline_zindex = 18
     error_line_index = 0
     for line in input_file:
         # Add one to index
@@ -430,18 +432,21 @@ def compile(input_file, output_file, encoding, keys):
             continue
         elif inside_TEKST:
             tek_wie -= 1
+            tek_wie2 = True
             if tek_wie > 0:
                 line = line.replace("\n", "\\n")
                 output_file.write(f'    printf("{line}");\n')
             else:
                 inside_TEKST = False
-                if tek_wie == -1:
+                if tek_wie2 == True:
                     line = line.replace("\n", "\\n")
+                    tek_wie2 = False
                 else:
                     line = line.replace("\n", "")
                 output_file.write(f'    printf("{line}");\n')
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
+            tek_wie2 = False
             tek_wie = 0
             line = line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")
             tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*')))
