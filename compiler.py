@@ -860,73 +860,73 @@ def compile(input_file, output_file, encoding, keys):
         ##########
         if czytaj != -1:
             line = line.replace(" ", "").replace("\n", "").replace("CZYTAJ:", "").split(",")
-            if line[len(line)-1] != "-":
-                t = line[0].replace("*", "")
-                for z, i in enumerate(line):
-                    vart = re.sub(r'\[.*?\]', '', i)
-                    if "*" in i:
-                        is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
-                        is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
-                        ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
-                        if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
-                        i = i.replace("*", "")
-                        output_file.write(f"    {ptr} = (void*){i};\n")
-                        output_file.write("    while (1) {\n")
-                        output_file.write("        if (fgets(input, sizeof(input), stdin) == NULL) {\n")
-                        output_file.write("            break;\n")
-                        output_file.write("        }\n")
-                        output_file.write("        char* trimmedInput = input;\n")
-                        output_file.write("        while (*trimmedInput == ' ') {\n")
-                        output_file.write("            trimmedInput++;\n")
-                        output_file.write("        }\n")
-                        output_file.write("        if (*trimmedInput == '*') {\n")
-                        output_file.write("            break;\n")
-                        output_file.write("        }\n")
-                        output_file.write("        if (isdigit(*trimmedInput) || *trimmedInput == '+' || *trimmedInput == '-') {\n")
-                        output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
-                        output_file.write("            while (token != NULL) {\n")
-                        output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
-                        output_file.write(f"                ptr{is_float}++;\n")
-                        output_file.write("                token = strtok(NULL, \" \\n\");\n")
-                        output_file.write("            }\n")
-                        output_file.write("        } else {\n")
-                        output_file.write("            char* delimiter = strpbrk(trimmedInput, \":=\");\n")
-                        output_file.write("            if (delimiter != NULL) {\n")
-                        output_file.write("                trimmedInput = delimiter + 1;\n")
-                        output_file.write("            }\n")
-                        output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
-                        output_file.write("            while (token != NULL) {\n")
-                        output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
-                        output_file.write(f"                ptr{is_float}++;\n")
-                        output_file.write("                token = strtok(NULL, \" \\n\");\n")
-                        output_file.write("            }\n")
-                        output_file.write("        }\n")
-                        output_file.write("    }\n")
-                        zline_zindex += 32
-                    else:
-                        is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
-                        is_float2 = "f" * ("float" in is_float) + "i" * ("int" in is_float)
-                        output_file.write(f"    {is_float} {i};\n")
-                        output_file.write("    fgets(input, sizeof(input), stdin);\n")
-                        output_file.write(f"    char* spacePtr = strchr(input, ' ');\n")
-                        output_file.write("    while (spacePtr) {\n")
-                        output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
-                        output_file.write(f"        spacePtr = strchr(input, ' ');\n")
-                        output_file.write("    }\n")
-                        output_file.write("    if (isdigit(input[0]) || input[0] == '+' || input[0] == '-') {\n")
-                        output_file.write(f"        {i} = ato{is_float2}(input);\n")
-                        output_file.write("    } else {\n")
-                        output_file.write("         char *ptr = strchr(input, ':');\n")
-                        output_file.write("         if (!ptr) ptr = strchr(input, '=');\n")
-                        output_file.write("         if (ptr) {\n")
-                        output_file.write("             memmove(input, ptr + 1, strlen(ptr));\n")
-                        output_file.write(f"             {i} = ato{is_float2}(input);\n")
-                        output_file.write("         }\n")
-                        output_file.write("    }\n")
-                        zline_zindex += 17
-                zline_zindex -= 1
-            else:
+            if line[len(line)-1] == "-":
                 moved_List_CZ = True
+                line.pop()
+            t = line[0].replace("*", "")
+            for z, i in enumerate(line):
+                vart = re.sub(r'\[.*?\]', '', i)
+                if "*" in i:
+                    is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
+                    ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
+                    if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
+                    i = i.replace("*", "")
+                    output_file.write(f"    {ptr} = (void*){i};\n")
+                    output_file.write("    while (1) {\n")
+                    output_file.write("        if (fgets(input, sizeof(input), stdin) == NULL) {\n")
+                    output_file.write("            break;\n")
+                    output_file.write("        }\n")
+                    output_file.write("        char* trimmedInput = input;\n")
+                    output_file.write("        while (*trimmedInput == ' ') {\n")
+                    output_file.write("            trimmedInput++;\n")
+                    output_file.write("        }\n")
+                    output_file.write("        if (*trimmedInput == '*') {\n")
+                    output_file.write("            break;\n")
+                    output_file.write("        }\n")
+                    output_file.write("        if (isdigit(*trimmedInput) || *trimmedInput == '+' || *trimmedInput == '-') {\n")
+                    output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
+                    output_file.write("            while (token != NULL) {\n")
+                    output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                    output_file.write(f"                ptr{is_float}++;\n")
+                    output_file.write("                token = strtok(NULL, \" \\n\");\n")
+                    output_file.write("            }\n")
+                    output_file.write("        } else {\n")
+                    output_file.write("            char* delimiter = strpbrk(trimmedInput, \":=\");\n")
+                    output_file.write("            if (delimiter != NULL) {\n")
+                    output_file.write("                trimmedInput = delimiter + 1;\n")
+                    output_file.write("            }\n")
+                    output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
+                    output_file.write("            while (token != NULL) {\n")
+                    output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                    output_file.write(f"                ptr{is_float}++;\n")
+                    output_file.write("                token = strtok(NULL, \" \\n\");\n")
+                    output_file.write("            }\n")
+                    output_file.write("        }\n")
+                    output_file.write("    }\n")
+                    zline_zindex += 32
+                else:
+                    is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = "f" * ("float" in is_float) + "i" * ("int" in is_float)
+                    output_file.write(f"    {is_float} {i};\n")
+                    output_file.write("    fgets(input, sizeof(input), stdin);\n")
+                    output_file.write(f"    char* spacePtr = strchr(input, ' ');\n")
+                    output_file.write("    while (spacePtr) {\n")
+                    output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
+                    output_file.write(f"        spacePtr = strchr(input, ' ');\n")
+                    output_file.write("    }\n")
+                    output_file.write("    if (isdigit(input[0]) || input[0] == '+' || input[0] == '-') {\n")
+                    output_file.write(f"        {i} = ato{is_float2}(input);\n")
+                    output_file.write("    } else {\n")
+                    output_file.write("         char *ptr = strchr(input, ':');\n")
+                    output_file.write("         if (!ptr) ptr = strchr(input, '=');\n")
+                    output_file.write("         if (ptr) {\n")
+                    output_file.write("             memmove(input, ptr + 1, strlen(ptr));\n")
+                    output_file.write(f"             {i} = ato{is_float2}(input);\n")
+                    output_file.write("         }\n")
+                    output_file.write("    }\n")
+                    zline_zindex += 17
+            zline_zindex -= 1
             continue
 
         #################
@@ -1055,15 +1055,15 @@ def compile(input_file, output_file, encoding, keys):
             line = line.replace(" ", "").replace("\n", "").replace("PISZNABEBENOD", "").split(":", 1)
             index = process_math_operation(line[0])
             line = line[1].split(",")
-            FILE = "FILE" * ("file" not in used_variables) + ""
+            FILE = "FILE *" * ("file" not in used_variables) + ""
             if "file" not in used_variables: used_variables.append("file")
-            output_file.write(f"    {FILE} *file = fopen(\"drum.txt\", \"r\");\n")
+            output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
             output_file.write("    if (file == NULL) {\n")
             output_file.write("        file = fopen(\"drum.txt\", \"w\");\n")
             output_file.write("        fclose(file);\n")
             output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
             output_file.write("    }\n")
-            output_file.write(f"    {FILE} *file2 = fopen(\"drum.tmp\", \"w\");\n")
+            output_file.write(f"    {FILE} file2 = fopen(\"drum.tmp\", \"w\");\n")
             output_file.write("    if (file != NULL) {\n")
             output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
             output_file.write("            fgets(input, sizeof(input), file);\n")
@@ -1112,6 +1112,92 @@ def compile(input_file, output_file, encoding, keys):
             output_file.write("    remove(\"drum.txt\");\n")
             output_file.write("    rename(\"drum.tmp\", \"drum.txt\");\n")
             zline_zindex += 25
+            continue
+
+        ##################
+        # CZYTAJ Z BEBNA #
+        ##################
+        if beben_czytaj_c:
+            line = line.replace(" ", "").replace("\n", "").replace("CZYTAJZBEBNAOD", "").split(":", 1)
+            index = process_math_operation(line[0])
+            line = line[1].split(",")
+            if line[len(line)-1] == "-":
+                moved_List_CZ = True
+                line.pop()
+            if len(line) == 0:
+                continue
+            FILE = "FILE *" * ("file" not in used_variables) + ""
+            if "file" not in used_variables: used_variables.append("file")
+            output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
+            output_file.write("    if (file != NULL) {\n")
+            output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
+            output_file.write("            fgets(input, sizeof(input), file);\n")
+            output_file.write("        }\n")
+            t = line[0].replace("*", "")
+            for z, i in enumerate(line):
+                vart = re.sub(r'\[.*?\]', '', i)
+                if "*" in i:
+                    is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
+                    ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
+                    if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
+                    i = i.replace("*", "")
+                    output_file.write(f"    {ptr} = (void*){i};\n")
+                    output_file.write(f"    for (int i = 0; elm({i}) > i; i++) {{\n")
+                    output_file.write("        if (fgets(input, sizeof(input), file) == NULL) {\n")
+                    output_file.write("            break;\n")
+                    output_file.write("        }\n")
+                    output_file.write("        char* trimmedInput = input;\n")
+                    output_file.write("        while (*trimmedInput == ' ') {\n")
+                    output_file.write("            trimmedInput++;\n")
+                    output_file.write("        }\n")
+                    output_file.write("        if (isdigit(*trimmedInput) || *trimmedInput == '+' || *trimmedInput == '-') {\n")
+                    output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
+                    output_file.write("            while (token != NULL) {\n")
+                    output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                    output_file.write(f"                ptr{is_float}++;\n")
+                    output_file.write("                token = strtok(NULL, \" \\n\");\n")
+                    output_file.write("            }\n")
+                    output_file.write("        } else {\n")
+                    output_file.write("            char* delimiter = strpbrk(trimmedInput, \":=\");\n")
+                    output_file.write("            if (delimiter != NULL) {\n")
+                    output_file.write("                trimmedInput = delimiter + 1;\n")
+                    output_file.write("            }\n")
+                    output_file.write("            char* token = strtok(trimmedInput, \" \\n\");\n")
+                    output_file.write("            while (token != NULL) {\n")
+                    output_file.write(f"                *ptr{is_float} = ato{is_float}(token);\n")
+                    output_file.write(f"                ptr{is_float}++;\n")
+                    output_file.write("                token = strtok(NULL, \" \\n\");\n")
+                    output_file.write("            }\n")
+                    output_file.write("        }\n")
+                    output_file.write("    }\n")
+                    zline_zindex += 32
+                else:
+                    is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    output_file.write(f"    {is_float} {i};\n")
+                    output_file.write("    fgets(input, sizeof(input), file);\n")
+                    output_file.write(f"    char* spacePtr = strchr(input, ' ');\n")
+                    output_file.write("    while (spacePtr) {\n")
+                    output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
+                    output_file.write(f"        spacePtr = strchr(input, ' ');\n")
+                    output_file.write("    }\n")
+                    output_file.write("    if (isdigit(input[0]) || input[0] == '+' || input[0] == '-') {\n")
+                    output_file.write(f"        {i} = ato{is_float2}(input);\n")
+                    output_file.write("    } else {\n")
+                    output_file.write("         char *ptr = strchr(input, ':');\n")
+                    output_file.write("         if (!ptr) ptr = strchr(input, '=');\n")
+                    output_file.write("         if (ptr) {\n")
+                    output_file.write("             memmove(input, ptr + 1, strlen(ptr));\n")
+                    output_file.write(f"             {i} = ato{is_float2}(input);\n")
+                    output_file.write("         }\n")
+                    output_file.write("    }\n")
+                    zline_zindex += 17
+            output_file.write("    } else {\n")
+            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+            output_file.write("    }\n")
+            output_file.write(f"    fclose(file);\n")
+            zline_zindex += 8
             continue
 
         ########
