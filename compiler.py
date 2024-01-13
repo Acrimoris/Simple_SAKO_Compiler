@@ -22,10 +22,9 @@ def process_math_operation(math_operation, user_functions=[]):
     C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "&"]
     operations_list = "+-()/×⋄*"
     not_replace = SAKO_functions + user_functions
-    # Replace '×' with '*' for multiplication
+    # Replace '*' with '^'
+    # Rest is lower, so it doesn't conflict with handle_square_brackets()
     math_operation = math_operation.replace('*', '^')
-    math_operation = math_operation.replace('×', '*')
-    math_operation = math_operation.replace('⋄', '*')
     math_operation = math_operation.replace("\n", "")
     # Change (x) in lists to [x]
     # Replace variables with four characters
@@ -130,6 +129,8 @@ def process_math_operation(math_operation, user_functions=[]):
             index = modified_operation.find(substring, index + 2)
 
     #print(modified_operation)
+    modified_operation = modified_operation.replace('×', '*')
+    modified_operation = modified_operation.replace('⋄', '*')
     return modified_operation
 
 def handle_square_brackets(expression, not_replace, user_functions=[]):
@@ -225,8 +226,9 @@ def compile(input_file, output_file, encoding, keys):
         error_line_index += 1
         # Make line case insensitive
         line = line.upper()
-        # Debug line
+        # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        print(integers)
         # Check for SAKO keywords
         # "start" stays, as I started with this keyword
         start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
@@ -584,7 +586,7 @@ def compile(input_file, output_file, encoding, keys):
                     i = i[:4]
                 else:
                     i = "*" + i.replace("*", "")[:4]
-                    values[z] = i
+                values[z] = i
             integers.extend(values)
             zline_zindex -= 1
             continue
@@ -1056,14 +1058,16 @@ def compile(input_file, output_file, encoding, keys):
             index = process_math_operation(line[0])
             line = line[1].split(",")
             FILE = "FILE *" * ("file" not in used_variables) + ""
+            FILE2 = "FILE *" * ("file2" not in used_variables) + ""
             if "file" not in used_variables: used_variables.append("file")
+            if "file2" not in used_variables: used_variables.append("file2")
             output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
             output_file.write("    if (file == NULL) {\n")
             output_file.write("        file = fopen(\"drum.txt\", \"w\");\n")
             output_file.write("        fclose(file);\n")
             output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
             output_file.write("    }\n")
-            output_file.write(f"    {FILE} file2 = fopen(\"drum.tmp\", \"w\");\n")
+            output_file.write(f"    {FILE2} file2 = fopen(\"drum.tmp\", \"w\");\n")
             output_file.write("    if (file != NULL) {\n")
             output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
             output_file.write("            fgets(input, sizeof(input), file);\n")
@@ -1122,7 +1126,7 @@ def compile(input_file, output_file, encoding, keys):
             index = process_math_operation(line[0])
             line = line[1].split(",")
             if line[len(line)-1] == "-":
-                moved_List_CZ = True
+                moved_List_CZzB = True
                 line.pop()
             if len(line) == 0:
                 continue
@@ -1137,11 +1141,12 @@ def compile(input_file, output_file, encoding, keys):
             for z, i in enumerate(line):
                 vart = re.sub(r'\[.*?\]', '', i)
                 if "*" in i:
+                    i = i.replace("*", "")
+                    i = process_math_operation(i)
                     is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
                     if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
-                    i = i.replace("*", "")
                     output_file.write(f"    {ptr} = (void*){i};\n")
                     output_file.write(f"    for (int i = 0; elm({i}) > i; i++) {{\n")
                     output_file.write("        if (fgets(input, sizeof(input), file) == NULL) {\n")
@@ -1173,6 +1178,7 @@ def compile(input_file, output_file, encoding, keys):
                     output_file.write("    }\n")
                     zline_zindex += 32
                 else:
+                    i = process_math_operation(i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     output_file.write(f"    {is_float} {i};\n")
