@@ -228,7 +228,7 @@ def compile(input_file, output_file, encoding, keys):
         line = line.upper()
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
-        print(integers)
+        # print(integers)
         # Check for SAKO keywords
         # "start" stays, as I started with this keyword
         start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
