@@ -16,14 +16,13 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - Some of SAKO language functions, mostly skipped functions performing operations on magnetic tapes
 - Keys from 0 to 35
 - Somewhat intuitive drum storage based on text (With my innovation — writing constants to it)
+- Using `STOP 𝛼` command to restart program from a label `𝛼`
 
 ## More notable NOT supported features
 - User defined functions
 - Changing array's size using `STRUKTURA`
 - `ROZDZIAL` declarations
-- Using `STOP 𝛼` command to restart program from a label `𝛼`
 - Numbers of type "double"
-- E notation
 - ANY binary and octal operations
 - `JEZYK SAS` and `JEZYK SAKO` declarations
 - Weird loop notation, like `1A)**)*`
