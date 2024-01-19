@@ -75,11 +75,13 @@ def process_math_operation(math_operation, user_functions=[]):
                     modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
                     modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
         else:
-            operations_list="⋄*-+/"
+            operations_list="()[]⋄*-+/"
             t = modified_operation.split("^")
             x = ""
             count = 0
             for i in reversed(t[0]):
+                if count < 0:
+                    break
                 if str(i) == ")":
                     x += str(i)
                     count += 1
@@ -99,20 +101,26 @@ def process_math_operation(math_operation, user_functions=[]):
             y = ""
             count = 0
             for i in t[1]:
-                if i == "(":
-                    count += 1
-                    y += str(i)
-                    continue
-                elif i == ")":
-                    count -= 1
-                    y += str(i)
-                    continue
+                if count < 0:
+                    break
                 if i not in operations_list:
                     y += str(i)
                     continue
-                elif count != 0:
+                else:
+                    if i == "(":
+                        count += 1
+                        y += str(i)
+                        continue
+                    elif i == ")":
+                        count -= 1
+                        y += str(i)
+                        continue
+                if count >= 0:
                     y += str(i)
                     continue
+            if x[0] == "(" and y[-1] == ")":
+                x = x[1:]
+                y = y[:-1]
             modified_operation = modified_operation.replace(f"{x}^{y}", f"pow({x},{y})")
 
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
@@ -169,7 +177,7 @@ def handle_square_brackets(expression, not_replace, user_functions=[]):
         expression = expression.replace(f'{z}', f'{result}')
     return expression
 
-def compile(input_file, output_file, encoding, keys):
+def compile(input_file, output_file, encoding, eliminate_stop, optional_commands):
     # Define global variables
     global loop_labels2
     global loops
@@ -183,6 +191,8 @@ def compile(input_file, output_file, encoding, keys):
     user_functions = []
     loops_wol = 0
     last_label = "POCZ"
+    keys = [0] * 36
+    keys = str(keys).replace("[", "{").replace("]", "}")
 
     # Add necessary C lines
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n\n")
@@ -210,6 +220,7 @@ def compile(input_file, output_file, encoding, keys):
     # Define boolean variables
     jezyk_SAS = False
     inside_TEKST = False
+    tek_wie2 = False
     inside_TABLICA = False
 
     moved_List_B = False
@@ -217,6 +228,8 @@ def compile(input_file, output_file, encoding, keys):
     moved_List_DR = False
     moved_List_DRW = False
     moved_List_CZW = False
+    moved_List_PnB = False
+    moved_List_CZzB = False
 
     zline_zindex = 18
     error_line_index = 0
@@ -224,46 +237,47 @@ def compile(input_file, output_file, encoding, keys):
         # Add one to index
         zline_zindex += 1
         error_line_index += 1
-        # Make line case insensitive
-        line = line.upper()
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # print(integers)
         # Check for SAKO keywords
+        test_line = line.replace(" ", "").replace("\n", "")
         # "start" stays, as I started with this keyword
-        start = line.replace(" ", "").replace("\n", "").replace(":", "").find("TEKST")
-        calkowite_c = line.replace(" ", "").find("CALKOWITE:")
-        decimal_operation_c = line.replace(" ", "").find("=")
-        octal_and_binary_operation_c = line.replace(" ", "").find("[")
-        stop = line.replace(" ", "").find("STOP")
-        koniec = line.replace(" ", "").find("KONIEC")
+        start = test_line.find("TEKST")
+        calkowite_c = test_line.find("CALKOWITE:")
+        decimal_operation_c = test_line.find("=")
+        octal_operation_c = test_line.find("[")
+        stop = test_line.find("STOP")
+        koniec = test_line.find("KONIEC")
         jump_to = re.match(match_gotos, line)
-        comment_c = line.replace(" ", "").find("K)") if line.replace(" ", "").find("K)") != -1 else line.replace(" ", "").find(":")
-        spaces = line.replace(" ", "").find("SPACJA") if line.replace(" ", "").find("SPACJA") != -1 else line.replace(" ", "").find("SPACJI")
-        newlines = line.replace(" ", "").find("LINIA") if line.replace(" ", "").find("LINIA") != -1 else line.replace(" ", "").find("LINII")
-        gdy_c = line.replace(" ", "").find("GDY")
-        gdy_inaczej_c = line.replace(" ", "").find("INACZEJ")
-        drukuj_c = line.replace(" ", "").find("DRUKUJ(")
-        blok_c = line.replace(" ", "").find("BLOK")
-        tablica_c = line.replace(" ", "").find("TABLICA")
-        label_c = re.match(match_labels, line) or re.match(r"^\**\)", line)
-        czytaj = line.replace(" ", "").find("CZYTAJ:")
-        loop_c = line.replace(" ", "").find("POWTORZ")
-        skocz_wedlug = line.replace(" ", "").find("SKOCZWEDLUG")
-        drukuj_wiersz = line.replace(" ", "").find("DRUKUJWIERSZ:")
-        czytaj_wiersz = line.replace(" ", "").find("CZYTAJWIERSZ:")
-        strona_c = line.replace(" ", "").replace("\n", "") == "STRONA"
-        beben_pisz_c = line.replace(" ", "").startswith("PISZNABEBENOD")
-        beben_czytaj_c = line.replace(" ", "").startswith("CZYTAJZBEBNAOD")
+        comment_c = test_line.startswith("K)") or test_line.startswith(":")
+        spaces = test_line.find("SPACJA") if test_line.find("SPACJA") != -1 else test_line.find("SPACJI")
+        newlines = test_line.find("LINIA") if test_line.find("LINIA") != -1 else test_line.find("LINII")
+        gdy_c = test_line.find("GDY")
+        gdy_inaczej_c = test_line.find(",INACZEJ")
+        drukuj_c = test_line.find("DRUKUJ(")
+        blok_c = test_line.find("BLOK")
+        tablica_c = test_line.find("TABLICA")
+        label_c = re.match(match_labels, test_line) or re.match(r"^\**\)", test_line)
+        czytaj = test_line.find("CZYTAJ:")
+        loop_c = test_line.find("POWTORZ")
+        skocz_wedlug = test_line.find("SKOCZWEDLUG")
+        drukuj_wiersz = test_line.find("DRUKUJWIERSZ:")
+        czytaj_wiersz = test_line.find("CZYTAJWIERSZ:")
+        strona_c = test_line.find("STRONA")
+        beben_pisz_c = test_line.find("PISZNABEBENOD")
+        beben_czytaj_c = test_line.find("CZYTAJZBEBNAOD")
+        # Make line case insensitive
+        if not inside_TEKST: line = line.upper()
 
         ###############
         # Empty Lines #
         ###############
-        if line.replace(" ", "").replace("\n","") == "" and inside_TEKST == False and not inside_TABLICA:
+        if test_line == "" and inside_TEKST == False and not inside_TABLICA:
             zline_zindex -= 1
             error_line_index -= 1
             continue
-        if line.replace(" ", "").replace("\n","").find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA and not line.strip().startswith("K)") and not line.strip().startswith(":"):
+        if test_line.find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA and not comment_c:
             zline_zindex -= 1
             error_line_index -= 1
             continue
@@ -271,19 +285,24 @@ def compile(input_file, output_file, encoding, keys):
         ############
         # COMMENTS #
         ############
-        if comment_c != -1 and inside_TEKST == False and not inside_TABLICA:
-            line = line.replace(" ", "")
-            if line.startswith("K)"):
-                zline_zindex -= 1
-                continue
-            elif line.startswith(":"):
-                zline_zindex -= 1
-                continue
+        if comment_c and inside_TEKST == False and not inside_TABLICA:
+            zline_zindex -= 1
+            continue
         if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA") or line.replace(" ", "").replace("\n","") == "KONIECROZDZIALU") and not inside_TABLICA and not inside_TEKST:
             zline_zindex -= 1
             continue
         if ";" in line:
             return "Semicolon", error_line_index + 1, last_label
+
+        ########################
+        # Optional translation #
+        ########################
+        if (line.replace(" ", "").startswith("'") or line.replace(" ", "").startswith("?")) and inside_TEKST == False and not inside_TABLICA:
+            if optional_commands:
+                line = line.replace("'", "").replace("?", "")
+            else:
+                zline_zindex -= 1
+                continue
 
         ###############
         # Moved lists #
@@ -385,7 +404,7 @@ def compile(input_file, output_file, encoding, keys):
         ##########
         if label_c:
             # TODO: Support weird loop notation, like "1A) *** *)*", or "*)*"
-            t = re.search(match_labels, line) or re.search(r"^\**\)", line)
+            t = re.search(match_labels, test_line) or re.search(r"^\**\)", test_line)
             t = t.group(0).replace(")", "")
             t2 = t.replace("*", "")
             t2 = t2[:4]
@@ -446,7 +465,6 @@ def compile(input_file, output_file, encoding, keys):
             continue
         elif inside_TEKST:
             tek_wie -= 1
-            tek_wie2 = True
             if tek_wie > 0:
                 line = line.replace("\n", "\\n")
                 output_file.write(f'    printf("{line}");\n')
@@ -460,7 +478,7 @@ def compile(input_file, output_file, encoding, keys):
                 output_file.write(f'    printf("{line}");\n')
             continue
         elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
-            tek_wie2 = False
+            tek_wie2 = True
             tek_wie = 0
             line = line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")
             tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*')))
@@ -666,7 +684,7 @@ def compile(input_file, output_file, encoding, keys):
 
             if len(line) >= 3 and count != True:
                 is_float = ""
-                whole = line.replace(" ", "").split("=")
+                whole = line.replace(" ", "").replace("\n", "").split("=")
                 variable = whole[0]
                 variable = process_math_operation(variable)
                 operation = whole[1]
@@ -677,6 +695,21 @@ def compile(input_file, output_file, encoding, keys):
                     if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
                 output_file.write(f"    {is_float} {variable} = {operation};\n")
                 continue
+
+        if octal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
+            line = line.replace(" ", "").replace("\n", "").split("[")
+            variable = line[0]
+            operation = line[1]
+            operation = operation.replace(".", "").replace("+", "|").replace("-", "~").replace("×", "&").replace("⋄", "&")
+            operation = f"0{operation}"
+            vart = re.sub(r'\[.*?\]', '', variable)[:4]
+            if variable[0] != "*":
+                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
+            output_file.write(f"    {is_float} {variable} = {operation};\n")
+            continue
+
+
 
         ###################
         # List Definition #
@@ -812,7 +845,7 @@ def compile(input_file, output_file, encoding, keys):
         ##########
         # STRONA #
         ##########
-        if strona_c:
+        if strona_c != -1:
             output_file.write("    printf(\"\");\n")
             continue
 
@@ -909,10 +942,12 @@ def compile(input_file, output_file, encoding, keys):
                     zline_zindex += 32
                 else:
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
-                    is_float2 = "f" * ("float" in is_float) + "i" * ("int" in is_float)
+                    is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    spacePtr = "char* " if "spacePtr" not in used_variables else ""
+                    if "spacePtr" not in used_variables: used_variables.append(f"spacePtr")
                     output_file.write(f"    {is_float} {i};\n")
                     output_file.write("    fgets(input, sizeof(input), stdin);\n")
-                    output_file.write(f"    char* spacePtr = strchr(input, ' ');\n")
+                    output_file.write(f"    {spacePtr} spacePtr = strchr(input, ' ');\n")
                     output_file.write("    while (spacePtr) {\n")
                     output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
                     output_file.write(f"        spacePtr = strchr(input, ' ');\n")
@@ -987,7 +1022,8 @@ def compile(input_file, output_file, encoding, keys):
                 line = line[0]
                 line = line.split(":")
                 label1 = line[1]
-                line = line[0].replace("GDYKLUCZ", "")
+                line = line[0]
+                line = line[8:]
                 line = process_math_operation(line)
                 if label1 == "NASTEPNY":
                     t = "//"
@@ -995,7 +1031,7 @@ def compile(input_file, output_file, encoding, keys):
                     t2 = "//"
                 label1, label2 = label1[:4], label2[:4]
                 line = f"keys[{line}] == 1"
-                output_file.write("    if (" + line + ") {\n")
+                output_file.write(f"    if ({line}) {{\n")
                 output_file.write(f"        {t}goto _{label1};\n")
                 output_file.write("    } else {\n")
                 output_file.write(f"        {t2}goto _{label2};\n")
@@ -1003,7 +1039,7 @@ def compile(input_file, output_file, encoding, keys):
                 zline_zindex += 4
                 continue
 
-            if line.replace(" ", "").startswith("GDYBYLNADMIAR"):
+            if line.replace(" ", "").startswith("GDYBYLNADMIAR:"):
                 line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
                 label2 = line[1]
                 label2 = label2[:4]
@@ -1015,13 +1051,14 @@ def compile(input_file, output_file, encoding, keys):
                 output_file.write(f"    {t}goto _{label2};\n")
                 continue
 
-            t, t2, mode = "", "", ""
+            t = t2 = mode = ""
             line = line.replace(" ", "").replace("\n", "").split(",INACZEJ")
             label2 = line[1]
             line = line[0]
             line = line.split(":")
             label1 = line[1]
-            line = line[0].replace("GDY", "")
+            line = line[0]
+            line = line[3:]
             if "=" in line:
                 whole = line.replace(" ", "").split("=")
                 mode = "=="
@@ -1053,10 +1090,16 @@ def compile(input_file, output_file, encoding, keys):
         #################
         # PISZ NA BEBEN #
         #################
-        if beben_pisz_c:
+        if beben_pisz_c != -1:
             line = line.replace(" ", "").replace("\n", "").replace("PISZNABEBENOD", "").split(":", 1)
             index = process_math_operation(line[0])
             line = line[1].split(",")
+            if line[len(line)-1] == "-":
+                moved_List_PnB = True
+                line.pop()
+            if len(line) == 0:
+                zline_zindex -= 1
+                continue
             FILE = "FILE *" * ("file" not in used_variables) + ""
             FILE2 = "FILE *" * ("file2" not in used_variables) + ""
             if "file" not in used_variables: used_variables.append("file")
@@ -1068,27 +1111,31 @@ def compile(input_file, output_file, encoding, keys):
             output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
             output_file.write("    }\n")
             output_file.write(f"    {FILE2} file2 = fopen(\"drum.tmp\", \"w\");\n")
-            output_file.write("    if (file != NULL) {\n")
-            output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
-            output_file.write("            fgets(input, sizeof(input), file);\n")
-            output_file.write("            if (input[0] == 0) {\n")
-            output_file.write("                fprintf(file2, \"\\n\");\n")
-            output_file.write("            } else {\n")
-            output_file.write("                fprintf(file2, input);\n")
-            output_file.write("            }\n")
+            output_file.write("    if (file == NULL) {\n")
+            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+            output_file.write("        return 1;\n")
+            output_file.write("    }\n")
+            output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+            output_file.write("        fgets(input, sizeof(input), file);\n")
+            output_file.write("        if (input[0] == 0) {\n")
+            output_file.write("            fprintf(file2, \"\\n\");\n")
+            output_file.write("        } else {\n")
+            output_file.write("             fprintf(file2, input);\n")
             output_file.write("        }\n")
+            output_file.write("     }\n")
             for i in line:
                 if i.startswith("*"):
                     is_float = "f" * (i not in integers) + "i" * (i in integers)
-                    is_float2 = "float" * (i not in integers) + "int" * (i in integers)
+                    is_float2 = ("float*" * (i not in integers) + "int*" * (i in integers)) * (i not in used_variables) + ""
                     is_float3 = "f" * (i not in integers) + "d" * (i in integers)
-                    ptr = f"{is_float2}* ptr{is_float}"
-                    output_file.write(f"        {ptr} = {i[1:]};\n")
-                    output_file.write(f"        for (int i = 0; i < elm({i[1:]}); ++i) {{\n")
-                    output_file.write(f"            fprintf(file2, \"%{is_float3}\\n\", *ptr{is_float});\n")
-                    output_file.write("            fgets(input, sizeof(input), file);\n")
-                    output_file.write(f"            ptr{is_float}++;\n")
-                    output_file.write("        }\n")
+                    if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
+                    ptr = f"{is_float2} ptr{is_float}"
+                    output_file.write(f"    {ptr} = {i[1:]};\n")
+                    output_file.write(f"    for (int i = 0; i < elm({i[1:]}); ++i) {{\n")
+                    output_file.write(f"        fprintf(file2, \"%{is_float3}\\n\", *ptr{is_float});\n")
+                    output_file.write("        fgets(input, sizeof(input), file);\n")
+                    output_file.write(f"        ptr{is_float}++;\n")
+                    output_file.write("    }\n")
                     zline_zindex += 6
                 else:
                     i = process_math_operation(i)
@@ -1108,20 +1155,20 @@ def compile(input_file, output_file, encoding, keys):
             output_file.write("        while(fgets(input, sizeof(input), file) != NULL) {\n")
             output_file.write("            fprintf(file2, input);\n")
             output_file.write("        }\n")
-            output_file.write("        fclose(file);\n")
-            output_file.write("        fclose(file2);\n")
-            output_file.write("    } else {\n")
-            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
-            output_file.write("    }\n")
-            output_file.write("    remove(\"drum.txt\");\n")
-            output_file.write("    rename(\"drum.tmp\", \"drum.txt\");\n")
+            if moved_List_CZzB:
+                zline_zindex -= 4
+            else:
+                output_file.write("    fclose(file);\n")
+                output_file.write("    fclose(file2);\n")
+                output_file.write("    remove(\"drum.txt\");\n")
+                output_file.write("    rename(\"drum.tmp\", \"drum.txt\");\n")
             zline_zindex += 25
             continue
 
         ##################
         # CZYTAJ Z BEBNA #
         ##################
-        if beben_czytaj_c:
+        if beben_czytaj_c != -1:
             line = line.replace(" ", "").replace("\n", "").replace("CZYTAJZBEBNAOD", "").split(":", 1)
             index = process_math_operation(line[0])
             line = line[1].split(",")
@@ -1129,14 +1176,18 @@ def compile(input_file, output_file, encoding, keys):
                 moved_List_CZzB = True
                 line.pop()
             if len(line) == 0:
+                zline_zindex -= 1
                 continue
             FILE = "FILE *" * ("file" not in used_variables) + ""
             if "file" not in used_variables: used_variables.append("file")
             output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
-            output_file.write("    if (file != NULL) {\n")
-            output_file.write(f"        for (int i = 0; {index} > i; i++) {{\n")
-            output_file.write("            fgets(input, sizeof(input), file);\n")
-            output_file.write("        }\n")
+            output_file.write("    if (file == NULL) {\n")
+            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+            output_file.write("        return 1;\n")
+            output_file.write("    }\n")
+            output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+            output_file.write("        fgets(input, sizeof(input), file);\n")
+            output_file.write("    }\n")
             t = line[0].replace("*", "")
             for z, i in enumerate(line):
                 vart = re.sub(r'\[.*?\]', '', i)
@@ -1181,9 +1232,11 @@ def compile(input_file, output_file, encoding, keys):
                     i = process_math_operation(i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    spacePtr = "char* " if "spacePtr" not in used_variables else ""
+                    if "spacePtr" not in used_variables: used_variables.append(f"spacePtr")
                     output_file.write(f"    {is_float} {i};\n")
                     output_file.write("    fgets(input, sizeof(input), file);\n")
-                    output_file.write(f"    char* spacePtr = strchr(input, ' ');\n")
+                    output_file.write(f"    {spacePtr} spacePtr = strchr(input, ' ');\n")
                     output_file.write("    while (spacePtr) {\n")
                     output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
                     output_file.write(f"        spacePtr = strchr(input, ' ');\n")
@@ -1193,16 +1246,14 @@ def compile(input_file, output_file, encoding, keys):
                     output_file.write("    } else {\n")
                     output_file.write("         char *ptr = strchr(input, ':');\n")
                     output_file.write("         if (!ptr) ptr = strchr(input, '=');\n")
-                    output_file.write("         if (ptr) {\n")
-                    output_file.write("             memmove(input, ptr + 1, strlen(ptr));\n")
-                    output_file.write(f"             {i} = ato{is_float2}(input);\n")
-                    output_file.write("         }\n")
+                    output_file.write("         memmove(input, ptr + 1, strlen(ptr));\n")
+                    output_file.write(f"        {i} = ato{is_float2}(input);\n")
                     output_file.write("    }\n")
-                    zline_zindex += 17
-            output_file.write("    } else {\n")
-            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
-            output_file.write("    }\n")
-            output_file.write(f"    fclose(file);\n")
+                    zline_zindex += 15
+            if moved_List_CZzB:
+                zline_zindex -= 1
+            else:
+                output_file.write(f"    fclose(file);\n")
             zline_zindex += 8
             continue
 
@@ -1210,7 +1261,14 @@ def compile(input_file, output_file, encoding, keys):
         # STOP #
         ########
         if stop != -1:
-            output_file.write("    return 0;\n")
+            if eliminate_stop:
+                line = line.replace(" ", "").replace("\n", "")[4:]
+                t = "//" * (line == "NASTEPNY") + ""
+                line = line[:4]
+                output_file.write("    fgets(input, sizeof(input), stdin);\n")
+                output_file.write(f"    {t}goto _{line};\n")
+            else:
+                output_file.write("    return 0;\n")
             continue
 
 
@@ -1220,11 +1278,7 @@ def compile(input_file, output_file, encoding, keys):
         if koniec != -1:
             line = line.replace("\n", "")
             line = line.replace(" ", "")
-            if len(line) > 6:
-                if ":" in line:
-                    output_file.write("}\n")
-            else:
-                output_file.write("}\n")
+            output_file.write("}\n")
             break
 
         return 2, error_line_index + 1, last_label
@@ -1234,6 +1288,8 @@ def compile(input_file, output_file, encoding, keys):
     ##########
     if len(loop_labels) != 0:
         return 26, error_line_index, last_label
+    if koniec == -1:
+        return 5, error_line_index, last_label
 
     return 0, error_line_index, last_label
 
@@ -1250,19 +1306,21 @@ def main():
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
     parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings.')
-    parser.add_argument("-k", "--keys", nargs='+', type=int, help="Numbers of keys set to on. Values from 0 to 35.")
     parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
     parser.add_argument('-Wall', '--all-warnings', action='store_true', help='Turn on -Wall flag while compiling using GCC.')
     parser.add_argument('-nc', '--no-compiling', action='store_true', help='Turn off compiling C code using GCC.')
+    parser.add_argument('-es', '--eliminate-stop', action='store_true', help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
+    parser.add_argument('-ot', '--optional-translation', action='store_true', help='Turn on compiling optional commands.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
     input_filename = args.input_filename
     encoding = args.encoding
-    keys_list = args.keys
     debug = args.debug
     wall_b = args.all_warnings
     nc = args.no_compiling
+    eliminate_stop = args.eliminate_stop
+    opt_comm = args.optional_translation
 
     if not os.path.isfile(input_filename):
         print("Error: Input file does not exist")
@@ -1275,19 +1333,12 @@ def main():
     tmp_b = ".tmp" * (not nc)
     tmp_output_filename = output_filename + f"{tmp_b}.c"
 
-    # Set keys to on
-    keys_on = [0] * 36
-    if keys_list != None:
-        for i in keys_list:
-            keys_on[i] = 1
-    keys_on = str(keys_on).replace("[", "{").replace("]", "}")
-
     try:
         tmp = open(tmp_output_filename, 'w')
         tmp.close()
         with open(input_filename, 'r') as input_file, open(tmp_output_filename, 'r+') as output_file:
             output_file.truncate()
-            result, error_index, label = compile(input_file, output_file, encoding, keys_on)
+            result, error_index, label = compile(input_file, output_file, encoding, eliminate_stop, opt_comm)
             # print("Now only loops left!!")
         with open(tmp_output_filename, "r+") as file:
             lines = file.readlines()
