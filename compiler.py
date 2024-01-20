@@ -310,6 +310,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         if "-" in integers:
             line = line.replace(" ", "").replace("\n", "").split(",")
             integers.remove("-")
+            for z, i in enumerate(line):
+                if "*" not in i:
+                    i = i[:4]
+                else:
+                    i = "*" + i.replace("*", "")[:4]
+                line[z] = i
             integers.extend(line)
             zline_zindex -= 1
             continue
@@ -588,17 +594,11 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # CALKOWITE #
         #############
         if calkowite_c != -1 and not inside_TABLICA:
-            calkowite_c += len("CALKOWITE:")
-
-            # Skip spaces
-            while calkowite_c < len(line) and line[calkowite_c].isspace():
-                calkowite_c += 1
-
             # Remove the \n symbol
-            line = line[:-1] if len(line) > 1 else line
+            line = line.replace("\n", "").replace(" ", "")
 
             # Extract values after "CALKOWITE:"
-            values = line.split(":")[1].replace(" ", "").split(",")
+            values = line.split(":")[1].split(",")
             for z, i in enumerate(values):
                 if "*" not in i:
                     i = i[:4]
@@ -700,8 +700,23 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             line = line.replace(" ", "").replace("\n", "").split("[")
             variable = line[0]
             operation = line[1]
-            operation = operation.replace(".", "").replace("+", "|").replace("-", "~").replace("×", "&").replace("⋄", "&")
-            operation = f"0{operation}"
+            operation = operation.replace("+", "|").replace("-", "~").replace("×", "&").replace("⋄", "&")
+            # change SAKO octal numbers to C octal numbers
+            t = ""
+            for i in operation:
+                if i == "." or i.isdigit():
+                    t += i
+                else:
+                    if "." in t:
+                        t2 = t.replace(".", "")
+                        t2 = f"0{t2}"
+                        operation = operation.replace(t, t2)
+                    t = ""
+            if "." in t:
+                t2 = t.replace(".", "")
+                t2 = f"0{t2}"
+                operation = operation.replace(t, t2)
+
             vart = re.sub(r'\[.*?\]', '', variable)[:4]
             if variable[0] != "*":
                 is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
