@@ -238,7 +238,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         zline_zindex += 1
         error_line_index += 1
         # Debug lines
-        #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # print(integers)
         # Check for SAKO keywords
         test_line = line.replace(" ", "").replace("\n", "")
@@ -258,7 +258,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         drukuj_c = test_line.find("DRUKUJ(")
         blok_c = test_line.find("BLOK")
         tablica_c = test_line.find("TABLICA")
-        label_c = re.match(match_labels, test_line) or re.match(r"^\**\)", test_line)
+        if not inside_TABLICA: label_c = re.match(match_labels, test_line) or re.match(r"^\**\)", test_line)
         czytaj = test_line.find("CZYTAJ:")
         loop_c = test_line.find("POWTORZ")
         skocz_wedlug = test_line.find("SKOCZWEDLUG")
@@ -402,7 +402,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # LABELS #
         ##########
-        if label_c:
+        if label_c and not inside_TABLICA and not inside_TEKST:
             # TODO: Support weird loop notation, like "1A) *** *)*", or "*)*"
             t = re.search(match_labels, test_line) or re.search(r"^\**\)", test_line)
             t = t.group(0).replace(")", "")
@@ -1090,39 +1090,49 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         # PISZ NA BEBEN #
         #################
-        if beben_pisz_c != -1:
-            line = line.replace(" ", "").replace("\n", "").replace("PISZNABEBENOD", "").split(":", 1)
-            index = process_math_operation(line[0])
-            line = line[1].split(",")
+        if beben_pisz_c != -1 or moved_List_PnB:
+            line = line.replace(" ", "").replace("\n", "")
+            if not moved_List_PnB:
+                line = line[13:].split(":", 1)
+                index = process_math_operation(line[0])
+                line = line[1].split(",")
+            else:
+                line = line.split(",")
+                zline_zindex -= 19
+            if not moved_List_PnB:
+                FILE = "FILE *" * ("file" not in used_variables) + ""
+                FILE2 = "FILE *" * ("file2" not in used_variables) + ""
+                if "file" not in used_variables: used_variables.append("file")
+                if "file2" not in used_variables: used_variables.append("file2")
+                output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
+                output_file.write("    if (file == NULL) {\n")
+                output_file.write("        file = fopen(\"drum.txt\", \"w\");\n")
+                output_file.write("        fclose(file);\n")
+                output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
+                output_file.write("    }\n")
+                output_file.write(f"    {FILE2} file2 = fopen(\"drum.tmp\", \"w\");\n")
+                output_file.write("    if (file == NULL) {\n")
+                output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+                output_file.write("        return 1;\n")
+                output_file.write("    }\n")
+                output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+                output_file.write("        fgets(input, sizeof(input), file);\n")
+                output_file.write("        if (input[0] == 0) {\n")
+                output_file.write("            fprintf(file2, \"\\n\");\n")
+                output_file.write("        } else {\n")
+                output_file.write("             fprintf(file2, input);\n")
+                output_file.write("        }\n")
+                output_file.write("     }\n")
+
+            # Check for moved list
+            moved_List_PnB = False
             if line[len(line)-1] == "-":
                 moved_List_PnB = True
                 line.pop()
             if len(line) == 0:
                 zline_zindex -= 1
                 continue
-            FILE = "FILE *" * ("file" not in used_variables) + ""
-            FILE2 = "FILE *" * ("file2" not in used_variables) + ""
-            if "file" not in used_variables: used_variables.append("file")
-            if "file2" not in used_variables: used_variables.append("file2")
-            output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
-            output_file.write("    if (file == NULL) {\n")
-            output_file.write("        file = fopen(\"drum.txt\", \"w\");\n")
-            output_file.write("        fclose(file);\n")
-            output_file.write("        file = fopen(\"drum.txt\", \"r\");\n")
-            output_file.write("    }\n")
-            output_file.write(f"    {FILE2} file2 = fopen(\"drum.tmp\", \"w\");\n")
-            output_file.write("    if (file == NULL) {\n")
-            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
-            output_file.write("        return 1;\n")
-            output_file.write("    }\n")
-            output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
-            output_file.write("        fgets(input, sizeof(input), file);\n")
-            output_file.write("        if (input[0] == 0) {\n")
-            output_file.write("            fprintf(file2, \"\\n\");\n")
-            output_file.write("        } else {\n")
-            output_file.write("             fprintf(file2, input);\n")
-            output_file.write("        }\n")
-            output_file.write("     }\n")
+
             for i in line:
                 if i.startswith("*"):
                     is_float = "f" * (i not in integers) + "i" * (i in integers)
@@ -1152,12 +1162,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     output_file.write(f"        fprintf(file2, \"%{is_float}\\n\", {i});\n")
                     output_file.write("        fgets(input, sizeof(input), file);\n")
                     zline_zindex += 2
-            output_file.write("        while(fgets(input, sizeof(input), file) != NULL) {\n")
-            output_file.write("            fprintf(file2, input);\n")
-            output_file.write("        }\n")
-            if moved_List_CZzB:
-                zline_zindex -= 4
+            if moved_List_PnB:
+                zline_zindex -= 7
             else:
+                output_file.write("        while(fgets(input, sizeof(input), file) != NULL) {\n")
+                output_file.write("            fprintf(file2, input);\n")
+                output_file.write("        }\n")
                 output_file.write("    fclose(file);\n")
                 output_file.write("    fclose(file2);\n")
                 output_file.write("    remove(\"drum.txt\");\n")
@@ -1168,26 +1178,37 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##################
         # CZYTAJ Z BEBNA #
         ##################
-        if beben_czytaj_c != -1:
-            line = line.replace(" ", "").replace("\n", "").replace("CZYTAJZBEBNAOD", "").split(":", 1)
-            index = process_math_operation(line[0])
-            line = line[1].split(",")
+        if beben_czytaj_c != -1 or moved_List_CZzB:
+            line = line.replace(" ", "").replace("\n", "")
+            if not moved_List_CZzB:
+                line = line[14:].split(":", 1)
+                index = process_math_operation(line[0])
+                line = line[1].split(",")
+            else:
+                line = line.split(",")
+                zline_zindex -= 8
+
+            if not moved_List_CZzB:
+                FILE = "FILE *" * ("file" not in used_variables) + ""
+                if "file" not in used_variables: used_variables.append("file")
+                output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
+                output_file.write("    if (file == NULL) {\n")
+                output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
+                output_file.write("        return 1;\n")
+                output_file.write("    }\n")
+                output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+                output_file.write("        fgets(input, sizeof(input), file);\n")
+                output_file.write("    }\n")
+
+            # Check for moved list
+            moved_List_CZzB = False
             if line[len(line)-1] == "-":
                 moved_List_CZzB = True
                 line.pop()
             if len(line) == 0:
                 zline_zindex -= 1
                 continue
-            FILE = "FILE *" * ("file" not in used_variables) + ""
-            if "file" not in used_variables: used_variables.append("file")
-            output_file.write(f"    {FILE} file = fopen(\"drum.txt\", \"r\");\n")
-            output_file.write("    if (file == NULL) {\n")
-            output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
-            output_file.write("        return 1;\n")
-            output_file.write("    }\n")
-            output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
-            output_file.write("        fgets(input, sizeof(input), file);\n")
-            output_file.write("    }\n")
+
             t = line[0].replace("*", "")
             for z, i in enumerate(line):
                 vart = re.sub(r'\[.*?\]', '', i)
@@ -1308,6 +1329,7 @@ def main():
     parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings.')
     parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
     parser.add_argument('-Wall', '--all-warnings', action='store_true', help='Turn on -Wall flag while compiling using GCC.')
+    parser.add_argument('-g', action='store_true', help='Turn on -g flag while compiling using GCC.')
     parser.add_argument('-nc', '--no-compiling', action='store_true', help='Turn off compiling C code using GCC.')
     parser.add_argument('-es', '--eliminate-stop', action='store_true', help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
     parser.add_argument('-ot', '--optional-translation', action='store_true', help='Turn on compiling optional commands.')
@@ -1318,6 +1340,7 @@ def main():
     encoding = args.encoding
     debug = args.debug
     wall_b = args.all_warnings
+    g_flag = args.g
     nc = args.no_compiling
     eliminate_stop = args.eliminate_stop
     opt_comm = args.optional_translation
@@ -1354,7 +1377,8 @@ def main():
         if not nc and result == 0:
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
-            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant -Os {wall} -o {output_filename}"
+            g_flag = "-g" * g_flag
+            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant -Os {g_flag} {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
         elif result != 0:
             print(f"{label} {error_index} BLAD {result} GLOW")
