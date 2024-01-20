@@ -31,7 +31,18 @@ def process_math_operation(math_operation, user_functions=[]):
     modified_operation = re.sub(r'\b([A-Z]+([0-9]*[A-Z]*)*)\b', lambda match: match.group(1)[:4], math_operation)
 
     # Replace round brackets with square brackets for list indexes
-    modified_operation = re.sub(r'(\b[A-Z][A-Z0-9]*\b)\(([^)]+)\)', lambda match: f'{match.group(1)}[{match.group(2)}]' if match.group(1) not in not_replace else match.group(0), modified_operation)
+    # modified_operation = re.sub(r'(\b[A-Z][A-Z0-9]*\b)\(([^)]+)\)', lambda match: f'{match.group(1)}[{match.group(2)}]' if match.group(1) not in not_replace else match.group(0), modified_operation)
+    pattern = r'(\b[A-Za-z][A-Za-z0-9]*)\((\w)\)'
+
+    matches = re.finditer(pattern, modified_operation)
+
+    for i in matches:
+        prefix = i.group(1)
+        if prefix not in not_replace:
+            t = f'{prefix}[{i.group(2)}]'
+            modified_operation = modified_operation.replace(i.group(0), t)
+
+    print(modified_operation)
 
     # Handle list indexes as math operations
     modified_operation = handle_square_brackets(modified_operation, not_replace, user_functions)
@@ -142,6 +153,7 @@ def process_math_operation(math_operation, user_functions=[]):
     return modified_operation
 
 def handle_square_brackets(expression, not_replace, user_functions=[]):
+    # TODO: For update — regexes don't perform well
     # Find all instances of array_name(...) within square brackets and process them recursively
     matches = re.findall(r'(\b[A-Za-z]+\b)\(([^)]+)\)', expression)
     for matching in matches:
@@ -427,8 +439,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 loop_labels.append([f"LS{loops}", zline_zindex+1])
                 loops += 1
                 loop_labels2.append([t.replace("*", "")[:4], zline_zindex+1])
-            line = re.sub(match_labels, '', line)
-            if re.search(r"^\**\)", line): line = re.sub(r"^\**\)", '', line)
+            line = re.sub(match_labels, "", line)
+            if re.search(r"^\**\)", test_line): line = re.sub(r"^\**\)", "", test_line)
             zline_zindex += 1
 
         ############################
@@ -913,10 +925,14 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             if line[len(line)-1] == "-":
                 moved_List_CZ = True
                 line.pop()
+            if len(line) == 0:
+                zline_zindex -= 1
+                continue
             t = line[0].replace("*", "")
             for z, i in enumerate(line):
                 vart = re.sub(r'\[.*?\]', '', i)
                 if "*" in i:
+                    i = "*" + i.replace("*", "")[:4]
                     is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
@@ -956,6 +972,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     output_file.write("    }\n")
                     zline_zindex += 32
                 else:
+                    i = i[:4]
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     spacePtr = "char* " if "spacePtr" not in used_variables else ""
@@ -986,6 +1003,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         if czytaj_wiersz != -1:
             line = line.replace(" ", "").replace("\n", "").replace("CZYTAJWIERSZ:", "").split(",")
+            i = i[:4]
             for i in line:
                 if f"*{i}" not in integers:
                     break
@@ -1007,7 +1025,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # DRUKUJ WIERSZ #
         #################
         if drukuj_wiersz != -1:
-            line = line.replace(" ", "").replace("\n", "").replace("DRUKUJWIERSZ", "").replace(":", "").split(",")
+            line = line.replace(" ", "").replace("\n", "").replace("DRUKUJWIERSZ:", "").split(",")
+            i = i[:4]
             for i in line:
                 if i == "-":
                     moved_List_DRW = True
