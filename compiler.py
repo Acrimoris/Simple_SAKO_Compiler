@@ -22,27 +22,24 @@ def process_math_operation(math_operation, user_functions=[]):
     C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "&"]
     operations_list = "+-()/×⋄*"
     not_replace = SAKO_functions + user_functions
+
     # Replace '*' with '^'
     # Rest is lower, so it doesn't conflict with handle_square_brackets()
     math_operation = math_operation.replace('*', '^')
     math_operation = math_operation.replace("\n", "")
+
     # Change (x) in lists to [x]
     # Replace variables with four characters
     modified_operation = re.sub(r'\b([A-Z]+([0-9]*[A-Z]*)*)\b', lambda match: match.group(1)[:4], math_operation)
 
     # Replace round brackets with square brackets for list indexes
-    # modified_operation = re.sub(r'(\b[A-Z][A-Z0-9]*\b)\(([^)]+)\)', lambda match: f'{match.group(1)}[{match.group(2)}]' if match.group(1) not in not_replace else match.group(0), modified_operation)
     pattern = r'(\b[A-Za-z][A-Za-z0-9]*)\((\w)\)'
-
     matches = re.finditer(pattern, modified_operation)
-
     for i in matches:
         prefix = i.group(1)
         if prefix not in not_replace:
             t = f'{prefix}[{i.group(2)}]'
             modified_operation = modified_operation.replace(i.group(0), t)
-
-    print(modified_operation)
 
     # Handle list indexes as math operations
     modified_operation = handle_square_brackets(modified_operation, not_replace, user_functions)
