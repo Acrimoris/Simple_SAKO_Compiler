@@ -15,6 +15,7 @@ def is_number(s):
     else:
         return "int"
 
+# TODO: Rework (with maybe more Lexer+Parser style)
 def process_math_operation(math_operation, user_functions=[]):
     global array_names
     # atan2 is not quite the same, but for me close enough (retunrs a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
@@ -83,7 +84,7 @@ def process_math_operation(math_operation, user_functions=[]):
                     modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
                     modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
         else:
-            operations_list="()[]⋄*-+/"
+            operations_list="()[]×⋄*-+/"
             t = modified_operation.split("^")
             x = ""
             count = 0
@@ -150,7 +151,6 @@ def process_math_operation(math_operation, user_functions=[]):
     return modified_operation
 
 def handle_square_brackets(expression, not_replace, user_functions=[]):
-    # TODO: For update — regexes don't perform well
     # Find all instances of array_name(...) within square brackets and process them recursively
     matches = re.findall(r'(\b[A-Za-z]+\b)\(([^)]+)\)', expression)
     for matching in matches:
@@ -249,6 +249,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # Debug lines
         # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # print(integers)
+        # Make line case insensitive
+        if not inside_TEKST and not jezyk_SAS: line = line.upper()
         # Check for SAKO keywords
         test_line = line.replace(" ", "").replace("\n", "")
         # "start" stays, as I started with this keyword
@@ -276,8 +278,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         strona_c = test_line.find("STRONA")
         beben_pisz_c = test_line.find("PISZNABEBENOD")
         beben_czytaj_c = test_line.find("CZYTAJZBEBNAOD")
-        # Make line case insensitive
-        if not inside_TEKST: line = line.upper()
 
         ###############
         # Empty Lines #
@@ -322,6 +322,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             for z, i in enumerate(line):
                 if "*" not in i:
                     i = i[:4]
+                    if i != "-":
+                        output_file.write(f"    int {i};\n")
+                        zline_zindex += 1
+                        used_variables.append(i)
                 else:
                     i = "*" + i.replace("*", "")[:4]
                 line[z] = i
@@ -611,6 +615,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             for z, i in enumerate(values):
                 if "*" not in i:
                     i = i[:4]
+                    if i != "-":
+                        output_file.write(f"    int {i};\n")
+                        zline_zindex += 1
+                        used_variables.append(i)
                 else:
                     i = "*" + i.replace("*", "")[:4]
                 values[z] = i
@@ -1000,8 +1008,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         if czytaj_wiersz != -1:
             line = line.replace(" ", "").replace("\n", "").replace("CZYTAJWIERSZ:", "").split(",")
-            i = i[:4]
             for i in line:
+                i = i[:4]
                 if f"*{i}" not in integers:
                     break
                 if i == "-":
