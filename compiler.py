@@ -1047,7 +1047,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # DRUKUJ WIERSZ #
         #################
         if drukuj_wiersz != -1:
-            print(integers)
             line = line.replace(" ", "").replace("\n", "").replace("DRUKUJWIERSZ:", "").split(",")
             for i in line:
                 i = i[:4]
