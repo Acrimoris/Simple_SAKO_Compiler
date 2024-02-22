@@ -890,10 +890,27 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 moved_List_DR = True
             line = line.replace(" ", "").replace("\n", "").replace("DRUKUJ(", "").replace("):", ":").split(":")
             t = line[1]
-            pattern_DRUKUJ = re.compile(r'\b(?:[A-Z]+\(\S*\)|\d+\.\d+|\w+\([^\)]*\)|\w+)')
-            t = pattern_DRUKUJ.findall(t)
-            # print(t)
             line = line[0].replace(",", ".")
+            # Broken, needs to be rewritten in more process_math...() style. TODO: Fix.
+            # pattern_DRUKUJ = re.compile(r'\b(?:[A-Z]+\(\S*\)|\d+\.\d+|\w+\([^\)]*\)|\w+)')
+            # t = pattern_DRUKUJ.findall(t)
+            t2 = ""
+            t3 = []
+            count = 0
+            for i in t:
+                if count < 0:
+                    break
+                if str(i) == "(":
+                    count += 1
+                elif str(i) == ")":
+                    count -= 1
+                t2 += str(i)
+                if i == "," and count == 0:
+                    t3.append(t2[:-1])
+                    t2 = ""
+            if t2 != "":
+                t3.append(t2)
+            # print(t3)
             if line.count(".") > 1:
                 line = line[:line[0].rfind(".")].split(".")
                 line[0] = process_math_operation(line[0])
@@ -903,7 +920,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line = process_math_operation(line)
             if moved_List_DR:
                 line_DR = line
-            for i in t:
+            for i in t3:
                 i = process_math_operation(i)
                 t2 = re.sub(r'\[.*?\]', '', i)
                 if i.isdigit():
@@ -1030,9 +1047,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # DRUKUJ WIERSZ #
         #################
         if drukuj_wiersz != -1:
+            print(integers)
             line = line.replace(" ", "").replace("\n", "").replace("DRUKUJWIERSZ:", "").split(",")
-            i = i[:4]
             for i in line:
+                i = i[:4]
                 if i == "-":
                     moved_List_DRW = True
                     break
@@ -1417,7 +1435,7 @@ def main():
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
             g_flag = "-g" * g_flag
-            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant -Os {g_flag} {wall} -o {output_filename}"
+            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
         elif result != 0:
             print(f"{label} {error_index} BLAD {result} GLOW")
