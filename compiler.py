@@ -224,7 +224,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
 
     # Define regexes patterns
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
-    match_gotos = r"^\s*SKOCZ\s*DO\s*"
 
     # Define boolean variables
     jezyk_SAS = False
@@ -247,7 +246,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         zline_zindex += 1
         error_line_index += 1
         # Debug lines
-        # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # print(integers)
         # Make line case insensitive
         if not inside_TEKST and not jezyk_SAS: line = line.upper()
@@ -260,7 +259,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         octal_operation_c = test_line.find("[")
         stop = test_line.find("STOP")
         koniec = test_line.find("KONIEC")
-        jump_to = re.match(match_gotos, line)
+        jump_to = test_line.find("SKOCZDO")
         comment_c = test_line.startswith("K)") or test_line.startswith(":")
         spaces = test_line.find("SPACJA") if test_line.find("SPACJA") != -1 else test_line.find("SPACJI")
         newlines = test_line.find("LINIA") if test_line.find("LINIA") != -1 else test_line.find("LINII")
@@ -508,7 +507,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # GOTOS #
         #########
-        if jump_to and not inside_TABLICA:
+        if jump_to != -1 and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "").replace("SKOCZDO", "").replace(":", "")[:4]
             if line != "NASTEPNY":
                 output_file.write(f"    goto _{line};\n")
@@ -994,7 +993,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     output_file.write("    }\n")
                     zline_zindex += 32
                 else:
-                    i = i[:4]
+                    i = process_math_operation(i)
+                    vart = re.sub(r'\[.*?\]', '', i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i not in used_variables) and (vart not in used_variables)) * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     spacePtr = "char* " if "spacePtr" not in used_variables else ""
@@ -1418,6 +1418,9 @@ def main():
         with open(input_filename, 'r') as input_file, open(tmp_output_filename, 'r+') as output_file:
             output_file.truncate()
             result, error_index, label = compile(input_file, output_file, encoding, eliminate_stop, opt_comm)
+            if result != 0:
+                print(f"{label} {error_index} BLAD {result} GLOW")
+                return 1;
             # print("Now only loops left!!")
         with open(tmp_output_filename, "r+") as file:
             lines = file.readlines()
@@ -1436,8 +1439,6 @@ def main():
             g_flag = "-g" * g_flag
             compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
-        elif result != 0:
-            print(f"{label} {error_index} BLAD {result} GLOW")
 
     except Exception as e:
         import traceback
