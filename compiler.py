@@ -134,14 +134,14 @@ def process_math_operation(math_operation, user_functions=[]):
 
     modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
 
-    operations_list="⋄*-+/=[]>"
+    operations_list="×⋄*-+/=[]>"
     for substring in array_names:
         if modified_operation == substring:
             modified_operation = f"*{modified_operation}"
             break
         index = modified_operation.find(substring)
         while index != -1:
-            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[' and modified_operation[index + len(substring)] in operations_list:
+            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[' and modified_operation[index + len(substring)] in operations_list and modified_operation[index - 1] != "(" and modified_operation[index - 2] != "m" and modified_operation[index - 3] != "l" and modified_operation[index - 4] != "e":
                 modified_operation = modified_operation[:index] + '*' + modified_operation[index:]
             index = modified_operation.find(substring, index + 2)
 
@@ -154,6 +154,8 @@ def handle_square_brackets(expression, not_replace, user_functions=[]):
     # Find all instances of array_name(...) within square brackets and process them recursively
     matches = re.findall(r'(\b[A-Za-z]+\b)\(([^)]+)\)', expression)
     for matching in matches:
+        if matching[1] in array_names:
+            return expression
         variable_name, subexpression = matching
         modified_subexpression = process_math_operation(subexpression, user_functions)
         if variable_name not in not_replace:
