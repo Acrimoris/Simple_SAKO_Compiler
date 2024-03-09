@@ -919,6 +919,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line = str(line[0]) + str(line[1])
             else:
                 line = process_math_operation(line)
+            if t3[-1] == "-":
+                moved_List_DR = True
+                t3.pop()
             if moved_List_DR:
                 line_DR = line
             for i in t3:
