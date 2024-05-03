@@ -204,6 +204,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     last_label = "POCZ"
     keys = [0] * 36
     keys = str(keys).replace("[", "{").replace("]", "}")
+    restricted_eval = {"__builtins__": None}
 
     # Add necessary C lines
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n\n")
@@ -258,7 +259,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         start = test_line.find("TEKST")
         calkowite_c = test_line.find("CALKOWITE:")
         decimal_operation_c = test_line.find("=")
-        octal_operation_c = test_line.find("[")
+        octal_operation_c = test_line.find("[") if test_line.find("[") != -1 else test_line.find("≡")
         stop = test_line.find("STOP")
         koniec = test_line.find("KONIEC")
         jump_to = test_line.find("SKOCZDO")
@@ -501,7 +502,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             tek_wie2 = True
             tek_wie = 0
             line = line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")
-            tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*')))
+            tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*'), restricted_eval))
             inside_TEKST = True
             zline_zindex -= 1
             continue
@@ -755,7 +756,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             line = line[0]
             line = line.split(",")
             for i in line:
-                i = str(eval(str(i.replace("*", "**").replace("×", "*").replace('⋄', '*')) + "+1"))
+                i = str(eval(str(i.replace("*", "**").replace("×", "*").replace('⋄', '*')) + "+1", restricted_eval))
                 t.append(f"[{i}]")
             line = ""
             for i in t:
@@ -781,7 +782,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             line = line.replace(" ", "").replace("\n", "").replace("TABLICA(", "").replace(")", "").split(":")
             TABLICA_numbers = line[0].split(",")
             for i in range(len(TABLICA_numbers)):
-                TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*").replace('⋄', '*')))
+                TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*").replace('⋄', '*'), restricted_eval))
             TABLICA_name = line[1][:4]
             t = ""
             used_variables.append(TABLICA_name)
