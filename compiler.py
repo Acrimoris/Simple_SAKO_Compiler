@@ -19,10 +19,11 @@ def is_number(s):
 def process_math_operation(math_operation, user_functions=[]):
     global array_names
     # atan2 is not quite the same, but for me close enough (retunrs a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
-    SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "&"]
+    SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "&", "read_int"]
+    double_functions = ["CZD", "DRD", "DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     operations_list = "+-()/×⋄*"
-    not_replace = SAKO_functions + user_functions
+    not_replace = SAKO_functions + user_functions + double_functions
 
     # Replace '*' with '^'
     # Rest is lower, so it doesn't conflict with handle_square_brackets()
@@ -110,6 +111,7 @@ def process_math_operation(math_operation, user_functions=[]):
             y = ""
             count = 0
             for i in t[1]:
+                #print(y, i, count)
                 if count < 0:
                     break
                 if i not in operations_list:
@@ -124,9 +126,11 @@ def process_math_operation(math_operation, user_functions=[]):
                         count -= 1
                         y += str(i)
                         continue
-                if count >= 0:
+                if count == 0:
                     y += str(i)
                     continue
+                else:
+                    break
             if x[0] == "(" and y[-1] == ")":
                 x = x[1:]
                 y = y[:-1]
@@ -241,6 +245,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_CZW = False
     moved_List_PnB = False
     moved_List_CZzB = False
+    moved_List_DRO = False
+    moved_List_CZO = False
 
     zline_zindex = 18
     error_line_index = 0
@@ -280,6 +286,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         strona_c = test_line.find("STRONA")
         beben_pisz_c = test_line.find("PISZNABEBENOD")
         beben_czytaj_c = test_line.find("CZYTAJZBEBNAOD")
+        drukuj_oktalnie = test_line.find("DRUKUJOKTALNIE:")
+        czytaj_oktalnie = test_line.find("CZYTAJOKTALNIE:")
 
         ###############
         # Empty Lines #
@@ -738,7 +746,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
 
             vart = re.sub(r'\[.*?\]', '', variable)[:4]
             if variable[0] != "*":
-                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                is_float = "unsigned long long" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "unsigned int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                 if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
             output_file.write(f"    {is_float} {variable} = {operation};\n")
             continue
@@ -918,8 +926,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line[0] = process_math_operation(line[0])
                 line[1] = process_math_operation(line[1])
                 line = str(line[0]) + str(line[1])
+                is_float2 = "f"
             else:
                 line = process_math_operation(line)
+                is_float2 = "d"
             if t3[-1] == "-":
                 moved_List_DR = True
                 t3.pop()
@@ -928,10 +938,16 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             for i in t3:
                 i = process_math_operation(i)
                 t2 = re.sub(r'\[.*?\]', '', i)
+                # TODO: Needs more checks for type, fix for mathematical operations.
                 if i.isdigit():
                     is_float = "f" * ("." in i) + "d" * ("." not in i)
                 else:
                     is_float = "f" * (f"{i}" not in integers and f"*{t2}" not in integers) + "d" * (f"{i}" in integers or f"*{t2}" in integers)
+                    operations_list = "+-()/×⋄*"
+                    if is_float == "f" and is_float2 == "d" and any(operation in i for operation in operations_list):
+                        is_float = is_float2
+                    if is_float2 == "f":
+                        is_float = is_float2
                 output_file.write("    if (" + i + " >= 0) {\n")
                 output_file.write(f"        printf(\" %{line}{is_float}\", {i});\n")
                 output_file.write("    } else {\n")
@@ -1070,6 +1086,61 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 output_file.write("         }\n")
                 output_file.write("    }\n")
                 zline_zindex += 8
+            zline_zindex -= 1
+            continue
+
+        ###################
+        # DRUKUJ OKTALNIE #
+        ###################
+        if drukuj_oktalnie != -1:
+            line = line.replace(" ", "").replace("\n", "").replace("DRUKUJOKTALNIE:", "").split(",")
+            for i in line:
+                i = i[:4]
+                if i == "-":
+                    moved_List_DRO = True
+                    break
+                variable = i
+                vart = re.sub(r'\[.*?\]', '', variable)[:4]
+                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                if "octal_index" not in used_variables:
+                    is_float2 = "int"
+                else:
+                    is_float2 = ""
+                    used_variables.append("octal_index")
+                if "octal_parts" not in used_variables:
+                    is_float3 = "char"
+                else:
+                    is_float3 = ""
+                    used_variables.append("octal_parts")
+                if is_float == "int":
+                    output_file.write(f"    {is_float3} octal_parts[4][4];\n")
+                    output_file.write(f"    {is_float2} octal_index = 0;\n")
+                    output_file.write(f"    while ({i} > 0 || octal_index < 4) {{\n")
+                    output_file.write(f"        int part = {i} % 0100;\n")
+                    output_file.write(f"        {i} /= 0100;\n")
+                    output_file.write("        snprintf(octal_parts[octal_index], sizeof(octal_parts[octal_index]), \"%02o\", part);\n")
+                    output_file.write("        octal_index++;\n")
+                    output_file.write("    }\n")
+                    output_file.write("    for (int i = 3; i >= 0; i--) {\n")
+                    output_file.write("        printf(\"%s\", octal_parts[i]);\n")
+                    output_file.write("        if (i > 0) {\n")
+                    output_file.write("            printf(\".\");\n")
+                    output_file.write("        }\n")
+                    output_file.write("    }\n")
+                    zline_zindex += 14
+                else:
+                    output_file.write("")
+                    zline_zindex += 0
+            zline_zindex -= 1
+            continue
+
+        ###################
+        # CZYTAJ OKTALNIE #
+        ###################
+        if czytaj_oktalnie != -1:
+            line = line.replace(" ", "").replace("\n", "").replace("CZYTAJOKTALNIE:", "").split(",")
+            for i in line:
+                    zline_zindex += 0
             zline_zindex -= 1
             continue
 
@@ -1408,7 +1479,7 @@ def main():
     opt_comm = args.optional_translation
 
     if not os.path.isfile(input_filename):
-        print("Error: Input file does not exist")
+        print(f"{input_filename}: cannot open '{input_filename}': No such file or directory")
         sys.exit(1)
 
     # Create the output filename without the extension
