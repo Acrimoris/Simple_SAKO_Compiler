@@ -19,7 +19,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
 
 ## More notable NOT supported features
-- User defined functions
+- User defined subroutines
 - Changing array's size using `STRUKTURA`
 - `ROZDZIAL` declarations
 - Numbers of type "double"
@@ -27,6 +27,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - `JEZYK SAS` and `JEZYK SAKO` declarations
 - Weird loop notation, like `1A)**)*`
 - Magnetic tape storage
+- Extensive subroutines utilisation using `PODSTAW`
 
 ## Usage
 - To use keys in your SAKO program, declare them at the start of the executable using the "-k" command line option. Specify the numbers of keys to turn on, separated by commas. Example: "./program -k 0,5,6,34" This command turns on keys with numbers 0, 5, 6, and 34.
