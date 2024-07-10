@@ -17,6 +17,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - Keys from 0 to 35
 - Somewhat intuitive drum storage based on text (With my innovation — writing constants to it)
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
+- `JEZYK SAS` and `JEZYK SAKO` declarations
 
 ## More notable NOT supported features
 - User defined subroutines
@@ -24,7 +25,6 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - `ROZDZIAL` declarations
 - Numbers of type "double"
 - ANY binary and octal operations
-- `JEZYK SAS` and `JEZYK SAKO` declarations
 - Weird loop notation, like `1A)**)*`
 - Magnetic tape storage
 - Extensive subroutines utilisation using `PODSTAW`
@@ -32,6 +32,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 ## Usage
 - To use keys in your SAKO program, declare them at the start of the executable using the "-k" command line option. Specify the numbers of keys to turn on, separated by commas. Example: "./program -k 0,5,6,34" This command turns on keys with numbers 0, 5, 6, and 34.
 - The drum storage is maintained as plain text, with entries separated by newline characters. Notably, both real and integer numbers occupy the same amount of space, eliminating any distinction in size between the two.
+- `JEZYK SAS` and `JEZYK SAKO` behave like `__asm__ (` and `);` and support normal C assembly syntax, not SAS syntax.
 
 ## More information
 For more information on SAKO programming language I recommend checking out [this repository](https://github.com/Acrimoris/Everything_about_SAKO).
