@@ -304,13 +304,13 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############
         # COMMENTS #
         ############
-        if comment_c and inside_TEKST == False and not inside_TABLICA:
+        if comment_c and inside_TEKST == False and not inside_TABLICA and not jezyk_SAS:
             zline_zindex -= 1
             continue
         if (line.replace(" ", "").startswith("USTAWSKALE") or line.replace(" ", "").startswith("ZWIEKSZSKALE") or line.replace(" ", "").startswith("SKALA") or line.replace(" ", "").replace("\n","") == "KONIECROZDZIALU") and not inside_TABLICA and not inside_TEKST:
             zline_zindex -= 1
             continue
-        if ";" in line:
+        if ";" in line and not jezyk_SAS:
             return "Semicolon", error_line_index + 1, last_label
 
         ########################
@@ -459,14 +459,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############################
         if line.replace(" ", "").replace("\n","") == "JEZYKSAS" and inside_TEKST == False and not inside_TABLICA:
             jezyk_SAS = True
-            output_file.write("    asm(")
+            output_file.write("    __asm__ (\n")
+            continue
         elif line.replace(" ", "").replace("\n","") == "JEZYKSAKO" and jezyk_SAS:
             jezyk_SAS = False
             output_file.write("    );\n")
+            continue
         elif line.replace(" ", "").replace("\n","") == "JEZYKSAKO" and not jezyk_SAS:
             return 29
         elif jezyk_SAS:
             output_file.write(f'        {line}')
+            continue
 
         #########
         # TEKST #
