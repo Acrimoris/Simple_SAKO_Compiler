@@ -32,7 +32,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 ## Usage
 - To use keys in your SAKO program, declare them at the start of the executable using the "-k" command line option. Specify the numbers of keys to turn on, separated by commas. Example: "./program -k 0,5,6,34" This command turns on keys with numbers 0, 5, 6, and 34.
 - The drum storage is maintained as plain text, with entries separated by newline characters. Notably, both real and integer numbers occupy the same amount of space, eliminating any distinction in size between the two.
-- `JEZYK SAS` and `JEZYK SAKO` behave like `__asm__ (` and `);` and support normal C assembly syntax, not SAS syntax.
+- `JEZYK SAS` and `JEZYK SAKO` behave like `__asm__ (` and `);` and support C assembly syntax, not SAS syntax.
 
 ## More information
 For more information on SAKO programming language I recommend checking out [this repository](https://github.com/Acrimoris/Everything_about_SAKO).
