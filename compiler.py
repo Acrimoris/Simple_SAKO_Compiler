@@ -438,7 +438,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             t2 = t.replace("*", "")
             t2 = t2[:4]
             if t2 != "":
-                output_file.write(f"    _{t2}:\n")
+                output_file.write(f"    _{t2}: ;\n")
                 last_label = t2
                 error_line_index = -1
             else:
@@ -693,7 +693,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                         r = "[0]" * (count2)
                         r2 = "[0]" * (count2 + 1)
                         used = "int " * (i not in used_variables)
-                        output_file.write(f"{indent}for ({used}{i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); {i}++) {{\n")
+                        output_file.write(f"{indent}for ({used}{i} = 0; {i} < sizeof({vart}{r})/sizeof({vart}{r2}); ++{i}) {{\n")
                         count += 1
                         t3.append(i)
                         zline_zindex += 1
@@ -861,7 +861,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 spaces = True
             if spaces == True:
                 t = process_math_operation(line)
-                output_file.write("    for (int i = 0; i < " + t +"; i++) {\n")
+                output_file.write("    for (int i = 0; i < " + t +"; ++i) {\n")
                 output_file.write("        printf(\" \");\n")
                 output_file.write("    }\n")
                 zline_zindex += 2
@@ -879,7 +879,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 newlines = True
             if newlines == True:
                 t = process_math_operation(line)
-                output_file.write("    for (int i = 0; i < " + str(t) +"; i++) {\n")
+                output_file.write("    for (int i = 0; i < " + str(t) +"; ++i) {\n")
                 output_file.write("        printf(\"\\n\");\n")
                 output_file.write("    }\n")
                 zline_zindex += 2
@@ -1251,7 +1251,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
                 output_file.write("        return 1;\n")
                 output_file.write("    }\n")
-                output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+                output_file.write(f"    for (int i = 0; {index} > i; ++i) {{\n")
                 output_file.write("        fgets(input, sizeof(input), file);\n")
                 output_file.write("        if (input[0] == 0) {\n")
                 output_file.write("            fprintf(file2, \"\\n\");\n")
@@ -1332,7 +1332,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
                 output_file.write("        return 1;\n")
                 output_file.write("    }\n")
-                output_file.write(f"    for (int i = 0; {index} > i; i++) {{\n")
+                output_file.write(f"    for (int i = 0; {index} > i; ++i) {{\n")
                 output_file.write("        fgets(input, sizeof(input), file);\n")
                 output_file.write("    }\n")
 
@@ -1356,7 +1356,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
                     if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
                     output_file.write(f"    {ptr} = (void*){i};\n")
-                    output_file.write(f"    for (int i = 0; elm({i}) > i; i++) {{\n")
+                    output_file.write(f"    for (int i = 0; elm({i}) > i; ++i) {{\n")
                     output_file.write("        if (fgets(input, sizeof(input), file) == NULL) {\n")
                     output_file.write("            break;\n")
                     output_file.write("        }\n")
@@ -1508,7 +1508,7 @@ def main():
             for i in reversed(loop_labels2):
                 # print(i)
                 loops -= 1
-                i[2] = f"{i[2]}    LS{loops}:\n"
+                i[2] = f"{i[2]}    LS{loops}: ;\n"
                 lines.insert(i[1]-1, i[2])
             file.seek(0)  # Move the file pointer to the beginning
             file.writelines(lines)
