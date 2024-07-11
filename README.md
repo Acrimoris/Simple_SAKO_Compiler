@@ -13,7 +13,7 @@ This is a very simple and basic SAKO to C compiler. You can consider it as havin
 - GOTO statements
 - If statements
 - Loops
-- Some of SAKO language functions, mostly skipped functions performing operations on magnetic tapes
+- Some of SAKO built-in subroutines, mostly skipped subroutines performing operations on magnetic tapes
 - Keys from 0 to 35
 - Somewhat intuitive drum storage based on text (With my innovation — writing constants to it)
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
