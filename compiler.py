@@ -15,14 +15,13 @@ def is_number(s):
     else:
         return "int"
 
-# TODO: Rework (with maybe more Lexer+Parser style)
+# TODO: Rework
 # Needs a major overhaul with correct type returns (division always returning float etc.)
 # Especially with the new doubles, that need proper converting from arrays
 def process_math_operation(math_operation, user_functions=[]):
     global array_names
-    # atan2 is not quite the same, but for me close enough (returns a value in range -pi to pi, while ARC returns 0<=ARC(X, Y)<=2pi)
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
     double_functions = ["CZD", "DRD", "DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     operations_list = "+-()/×⋄*"
     not_replace = SAKO_functions + user_functions + double_functions
@@ -221,6 +220,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : 1))\n")
     output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
+    output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
 
     # Add macros and functions for double numbers
     output_file.write("#define GET_MACRO(_1,_2,_3,NAME,...) NAME\n")
@@ -252,14 +252,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("int CZD(double* num) { char input[500]; char convert[500]; double tmp = 0.0; int erno = -1; int i = 0; fgets(input, sizeof(input), stdin); char* ptr = input; while (*ptr != '\\0' && *ptr != '\\n') { if (isdigit(*ptr) || *ptr == '.' || *ptr == '+' || *ptr == '-' || *ptr == 'E') { convert[i] = *ptr; i++; erno = *ptr; ptr++; } else { input[0] = -1; break; } } erno = encoding[erno]; if (input[0] == -1) { erno = -erno; } errno = 0; tmp = strtod(convert, &ptr); if (errno == ERANGE && tmp <= DBL_MIN) { erno = -(erno+64); } else if (errno == ERANGE && tmp == HUGE_VAL) { erno = -(erno+128); } *num = tmp; return erno; }\n\n")
 
     # DRUKUJ C function
-    output_file.write("void drukuj(int I, int J, int is_K, int type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 2; char format[30]; if (type == 0){ formatTemplate = \"%%%dd\"; totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 4; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1&& is_K == 0) { snprintf(format, sizeof(format), \"%%%d.%dE\", totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); } } \n\n")
+    output_file.write("void drukuj(int I, int J, int is_K, int type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 1; char format[30]; if (type == 0){ formatTemplate = \" %%%dd\"; totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 5; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } totalWidth += 1; snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1 && is_K == 0) { snprintf(format, sizeof(format), \"%%%d.%dE\", totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); } }\n\n")
 
     # Global variables
     output_file.write(f"int keys[] = {keys}; int opt;\n")
     output_file.write("int main(int argc, char *argv[]) {\n")
-    output_file.write("    char input[120];\n")
     # Oneliner for getting keys
     output_file.write("    while ((opt = getopt(argc, argv, \"k:\")) != -1) { if (opt == 'k') { char *token = strtok(optarg, \",\"); while (token != NULL) { int index = atoi(token); if (index >= 0 && index < 35) { keys[index] = 1; } token = strtok(NULL, \",\"); } } }\n")
+    # Input variable
+    output_file.write("    char input[120];\n")
 
     # Define regexes patterns
     match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
@@ -280,7 +281,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_DRO = False
     moved_List_CZO = False
 
-    zline_zindex = 42
+    zline_zindex = 43
     error_line_index = 0
     for line in input_file:
         # Add one to index
@@ -647,7 +648,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 output_file.write("    }\n")
                 zline_zindex += 3
             else:
-                output_file.write("    if (fabs(" + str(step) + "/2.0) <= fabs(" + str(variable)  + "-" + str(end) + ")) {\n")
+                output_file.write("    if (fabs(" + str(step) + "/2.0) <= fabs(" + str(variable)  + "-(" + str(end) + "))) {\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {label1};\n")
                 output_file.write("    }\n")
@@ -890,7 +891,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         if spaces != -1:
             spaces = False
             line = line.replace(":", "")
-            line = line.replace("SPACJA", "").replace("SPACJI", "")
+            line = line[6:]
             if line != "":
                 spaces = True
             if spaces == True:
@@ -908,7 +909,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############
         if newlines != -1:
             newlines = False
-            line = line.replace(":", "").replace("LINIA", "").replace("LINII", "")
+            line = line.replace(":", "")
+            line = line[5:]
             if line != "":
                 newlines = True
             if newlines == True:
@@ -925,7 +927,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # STRONA #
         ##########
         if strona_c != -1:
-            output_file.write("    printf(\"\");\n")
+            output_file.write("    printf(\"\\f\");\n")
             continue
 
         ######################
