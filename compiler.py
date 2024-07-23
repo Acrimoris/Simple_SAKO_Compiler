@@ -833,10 +833,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 is_float = ""
                 whole = line.split("=")
                 variable = whole[0]
+                if variable[:2] == "(*" and variable[-1] == ")":
+                    variable = f"(*{variable[2:][:-1][:4]})"
                 variable = process_math_operation(variable)
                 operation = whole[1]
+                if operation[:2] == "(*" and operation[-1] == ")":
+                    operation = f"(*{operation[2:][:-1][:4]})"
                 operation = process_math_operation(operation, user_functions)
-                vart = re.sub(r'\[.*?\]', '', variable)[:4]
+                if variable[0] != "(" and variable[-1] != ")":
+                    vart = re.sub(r'\[.*?\]', '', variable)[:4]
                 if variable[0] != "*":
                     is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                     if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
