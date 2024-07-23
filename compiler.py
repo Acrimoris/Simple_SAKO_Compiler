@@ -15,185 +15,242 @@ def is_number(s):
     else:
         return "int"
 
-# TODO: Rework
-# Needs a major overhaul with correct type returns (division always returning float etc.)
-# Especially with the new doubles, that need proper converting from arrays
-def process_math_operation(math_operation, user_functions=[]):
-    global array_names
+def process_math_operation(math_operation: str, user_functions=[]) -> str:
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
     C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
-    double_functions = ["CZD", "DRD", "DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
-    operations_list = "+-()/×⋄*"
-    not_replace = SAKO_functions + user_functions + double_functions
+    double_functions = ["DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
+    read_double = "CZD"
+    print_double = "DRD"
 
-    # Replace '*' with '^'
-    # Rest is lower, so it doesn't conflict with handle_square_brackets()
-    math_operation = math_operation.replace('*', '^')
-    math_operation = math_operation.replace("\n", "")
+    # Check for ()
+    if math_operation == "()":
+        return ""
 
-    # Change (x) in lists to [x]
-    # Replace variables with four characters
-    modified_operation = re.sub(r'\b([A-Z]+([0-9]*[A-Z]*)*)\b', lambda match: match.group(1)[:4], math_operation)
+    # Get rid of preceding zeros to avoid accidental octals
+    # Use regex to find numbers and remove leading zeros
+    math_operation = re.sub(r'\b0+(\d)', r'\1', math_operation)
 
-    # Replace round brackets with square brackets for list indexes
-    pattern = r'(\b[A-Za-z][A-Za-z0-9]*)\((\w)\)'
-    matches = re.finditer(pattern, modified_operation)
-    for i in matches:
-        prefix = i.group(1)
-        if prefix not in not_replace:
-            t = f'{prefix}[{i.group(2)}]'
-            modified_operation = modified_operation.replace(i.group(0), t)
+    # Handle square brackets
+    math_operation = handle_square_brackets(math_operation)
 
-    # Handle list indexes as math operations
-    modified_operation = handle_square_brackets(modified_operation, not_replace, user_functions)
+    # Replace "*" with "$" for further processing
+    math_operation = math_operation.replace('*', '$')
 
-    # Handle "to the power of" operations, which aren't supported as good in C
-    if "^" in modified_operation:
-        # TODO: Make multiple "to the power of" operations in line more reliable
-        # Probably get rid of the regex.
-        if modified_operation.count("^") > 1:
-            pattern = re.compile(r'(\w+|\w+\([^)]*\)|\w+\[[^\]]*\])\^(\w+)')
-            while '^' in modified_operation:
-                modified_operation = re.sub(pattern, r'pow(\1, \2)', modified_operation)
-            t = []
-            t2 = []
-            for i in range(len(modified_operation)):
-                if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "(":
-                    count = 1
-                    t.append(i)
-                    for z in range(i+2, len(modified_operation)):
-                        if modified_operation[z] == "(":
-                            count += 1
-                        elif modified_operation[z] == ")":
-                            count -= 1
-                        if count == 0:
-                            t2.append(z)
-                            break
-                if modified_operation[i] == ")" and i < len(modified_operation)-1 and modified_operation[i+1] == "[":
-                    count = 1
-                    t.append(i)
-                    for z in range(i+2, len(modified_operation)):
-                        if modified_operation[z] == "[":
-                            count += 1
-                        elif modified_operation[z] == "]":
-                            count -= 1
-                        if count == 0:
-                            t2.append(z+1)
-                            break
-            for i in range(len(t)):
-                if t[i] > t2[i]:
-                    modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
-                    modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
-                else:
-                    modified_operation = modified_operation[:t2[i]] + ")" + modified_operation[t2[i]:]
-                    modified_operation = modified_operation[:t[i]] + modified_operation[t[i] + 1:]
+    # Handle numbers of type double
+    # Probably will need reworking
+    # Expecially this huge function
+    #
+    # Handle doubles being assigned a value
+    operations_list = "+-/×⋄$"
+    if math_operation[:2] == "($" and math_operation[-1:] == ")" and not any(char in operations_list for char in math_operation[2:][:-1]) and len(math_operation) <=7 and math_operation[2:][:-1] in array_names:
+        math_operation = math_operation[2:][:-1]
+        math_operation = f"*((double*){math_operation})"
+    # Handle doubles in functions
+    elif any(sub in math_operation for sub in double_functions):
+        math_operation = handle_doubles(math_operation, double_functions)
+    # Reading doubles
+    elif math_operation.startswith(f"{read_double}("):
+        math_operation = math_operation.replace("$", "(double*)&")
+    elif math_operation.startswith(read_double):
+        print("No support yet for assignments like (*A) = CZD")
+    # Printing doubles
+    # TODO: Add support for S argument and better K support
+    elif math_operation.startswith(f"{print_double}("):
+        t = math_operation.split(",")[0].replace("DRD(", "")
+        math_operation = math_operation.replace(t, f"*((double *){t[1:]})")
+        if math_operation.count(",") >= 3:
+            math_operation = math_operation.split(",")
+            math_operation.insert(3, "1")
+            math_operation = ",".join(math_operation)
         else:
-            operations_list="()×⋄*-+/"
-            t = modified_operation.split("^")
-            x = ""
-            count = 0
-            for i in reversed(t[0]):
-                if count < 0:
-                    break
-                if str(i) == ")":
-                    x += str(i)
-                    count += 1
-                    continue
-                elif str(i) == "(":
-                    count -= 1
-                    x += str(i)
-                    continue
-                if str(i) not in operations_list:
-                    x += str(i)
-                else:
-                    if count != 0:
-                        x += str(i)
-                    else:
-                        break
-            x = x[::-1]
-            y = ""
-            count = 0
-            for i in t[1]:
-                #print(y, i, count)
-                if count < 0:
-                    break
-                if i not in operations_list:
-                    y += str(i)
-                    continue
-                else:
-                    if i == "(":
-                        count += 1
-                        y += str(i)
-                        continue
-                    elif i == ")":
-                        count -= 1
-                        y += str(i)
-                        continue
-                if count != 0:
-                    y += str(i)
-                    continue
-                else:
-                    break
-            if x[0] == "(" and y[-1] == ")":
-                x = x[1:]
-                y = y[:-1]
-            modified_operation = modified_operation.replace(f"{x}^{y}", f"pow({x},{y})")
+            math_operation = math_operation.split(",")
+            math_operation[2] = math_operation[2][:-1]
+            math_operation.insert(3, "0)")
+            math_operation = ",".join(math_operation)
 
-    modified_operation = modified_operation if not any(sub in modified_operation for sub in SAKO_functions) else reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted(zip(SAKO_functions, C_functions), key=lambda x: len(x[0]), reverse=True), modified_operation)
-
-    operations_list="×⋄*-+/=[]>"
-    for substring in array_names:
-        if modified_operation == substring:
-            modified_operation = f"*{modified_operation}"
-            break
-        index = modified_operation.find(substring)
-        while index != -1:
-            if index + len(substring) < len(modified_operation) and modified_operation[index + len(substring)] != '[' and modified_operation[index + len(substring)] in operations_list and modified_operation[index - 1] != "(" and modified_operation[index - 2] != "m" and modified_operation[index - 3] != "l" and modified_operation[index - 4] != "e":
-                modified_operation = modified_operation[:index] + '*' + modified_operation[index:]
-            index = modified_operation.find(substring, index + 2)
-
-    #print(modified_operation)
-    modified_operation = modified_operation.replace('×', '*')
-    modified_operation = modified_operation.replace('⋄', '*')
-    return modified_operation
-
-def handle_square_brackets(expression, not_replace, user_functions=[]):
-    # Find all instances of array_name(...) within square brackets and process them recursively
-    matches = re.findall(r'(\b[A-Za-z]+\b)\(([^)]+)\)', expression)
-    for matching in matches:
-        if matching[1] in array_names:
-            return expression
-        variable_name, subexpression = matching
-        modified_subexpression = process_math_operation(subexpression, user_functions)
-        if variable_name not in not_replace:
-            expression = expression.replace(f'{variable_name}({subexpression})', f'{variable_name}[{modified_subexpression}]')
-        else:
-            expression = expression.replace(f'{variable_name}({subexpression})', f'{variable_name}({modified_subexpression})')
-
-    square_bracket_matches = re.findall(r'\[([^]]+)\]', expression)
-    count = 0
-    result = ""
-    for z in square_bracket_matches:
+    # Handle "to the power of" operations
+    # Temporarily disabled, waiting for doubles.
+    while "$" in math_operation:
+        t = math_operation.split("$", 1)
+        operations_list="()×⋄-+/[],"
+        x = ""
         count = 0
-        result = ""
-        for i in z:
-            if i == "(":
+        for i in reversed(t[0]):
+            # print("X:", x, i, count)
+            if count < 0:
+                break
+            if i == ")" or i == "]":
+                x += i
                 count += 1
-                result += i
                 continue
-            if i == ")":
+            elif i == "(" or i == "[":
                 count -= 1
-                result += i
+                x += i
                 continue
-            if i == ",":
-                if count == 0:
-                    result += "]["
+            if i not in operations_list:
+                x += i
+            else:
+                if count != 0:
+                    x += i
                 else:
-                    result += i
+                    break
+        x = x[::-1]
+        y = ""
+        count = 0
+        for i in t[1]:
+            # print("Y:", y, i, count)
+            if count < 0:
+                y = y[:-1]
+                break
+            if i not in operations_list:
+                y += i
                 continue
-            result += i
-        expression = expression.replace(f'{z}', f'{result}')
-    return expression
+            else:
+                if i == "(" or i == "[":
+                    count += 1
+                    y += i
+                    continue
+                elif i == ")" or i == "]":
+                    count -= 1
+                    y += i
+                    continue
+            if count != 0:
+                y += i
+                continue
+            else:
+                break
+        if x[0] == "[" and y[-1] == "]":
+            x = x[1:]
+            y = y[:-1]
+        if x[0] == "(" and y[-1] == ")":
+            x = x[1:]
+            y = y[:-1]
+        math_operation = math_operation.replace(f"{x}${y}", f"pow({x},{y})")
+
+    # Replace SAKO functions with C functions
+    if any(sub in math_operation for sub in SAKO_functions):
+        pairs = zip(SAKO_functions, C_functions)
+        sorted_pairs = sorted(pairs, key=lambda x: len(x[0]), reverse=True)
+        math_operation = reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted_pairs, math_operation)
+
+    # Replace `array_name` with `*array_name` when no index is given
+    operations_list="×⋄-+/,])"
+    for substring in array_names:
+        if math_operation == substring:
+            math_operation = f"*{math_operation}"
+            break
+        index = math_operation.find(substring)
+        while index != -1:
+            if index + len(substring) < len(math_operation) and math_operation[index + len(substring)] != '[' and math_operation[index + len(substring)] in operations_list and (math_operation[index - 1] != "(" and math_operation[index - 2] != "m" and math_operation[index - 3] != "l" and math_operation[index - 4] != "e") and (math_operation[index-1] != "&" and (math_operation[index-1] != ")" and math_operation[index-2] != "*" and math_operation[index-3] != "e" and math_operation[index-3] != "l")):
+                math_operation = math_operation[:index] + '*' + math_operation[index:]
+            index = math_operation.find(substring, index + 2)
+
+    # Replace other operation signs with corresponding C ones
+    math_operation = math_operation.replace('×', '*')
+    math_operation = math_operation.replace('⋄', '*')
+
+    return math_operation
+
+def handle_square_brackets(math_operation: str) -> str:
+    operations_list = "+-/×⋄*"
+    new_operation = ""
+    part = ""
+    count_p = 0
+    count_sb = 0
+    is_array= False
+    for i in math_operation:
+        if i in operations_list and count_p + count_sb == 0:
+            part += i
+            new_operation += part
+            part = ""
+        elif i == "(":
+            is_array = part in array_names or part.split("[")[-1] in array_names or any((part.split(char)[-1] in array_names) for char in operations_list)
+            if is_array and part != "":
+                part += "["
+                count_sb += 1
+            else:
+                part += i
+                count_p += 1
+        elif i == ")":
+            if part.count("[") - part.count("]") > 0 and count_p == 0:
+                part += "]"
+                count_sb -= 1
+            else:
+                part += i
+                count_p -= 1
+        elif i == "," and count_p == 0:
+            part += "]["
+        else:
+            part += i
+    if part != "":
+        new_operation += part
+    return new_operation
+
+def handle_doubles(math_operation, double_functions):
+    def find_matching_paren(s, start):
+        stack = []
+        for i in range(start, len(s)):
+            if s[i] == '(':
+                stack.append('(')
+            elif s[i] == ')':
+                stack.pop()
+                if not stack:
+                    return i
+        return -1
+
+    def process_argument(arg, arg_index, func):
+        arg = arg.strip()
+        if arg.startswith("$"):
+            if arg_index == 2:  # third argument case
+                return "(double*)&" + arg[1:]
+            else:
+                return "*((double*)" + arg[1:] + ")"
+        return arg
+
+    def transform_recursive(s):
+        i = 0
+        while i < len(s):
+            for func in double_functions:
+                if s[i:].startswith(func):
+                    start_idx = s.index('(', i)
+                    end_idx = find_matching_paren(s, start_idx)
+
+                    # Process the inner function call recursively first
+                    inner_content = s[start_idx+1:end_idx]
+                    args = []
+                    nested_start = 0
+                    j = 0
+                    while j < len(inner_content):
+                        if inner_content[j] == '(':
+                            nested_end = find_matching_paren(inner_content, j)
+                            if nested_end != -1:
+                                nested_arg = inner_content[nested_start:nested_end+1]
+                                nested_transformed = transform_recursive(nested_arg)
+                                args.append(nested_transformed)
+                                nested_start = nested_end + 1
+                                j = nested_end
+                        elif inner_content[j] == ',' or j == len(inner_content) - 1:
+                            if j == len(inner_content) - 1:
+                                j += 1
+                            arg = inner_content[nested_start:j].strip()
+                            if arg:
+                                args.append(arg)
+                            nested_start = j + 1
+                        j += 1
+
+                    # Transform the arguments
+                    new_args = [process_argument(arg, idx, func) for idx, arg in enumerate(args)]
+                    new_args_str = ', '.join(new_args)
+                    transformed_call = f"{func}({new_args_str})"
+
+                    # Replace the original function call in the math_operation
+                    s = s[:i] + transformed_call + s[end_idx+1:]
+                    i += len(transformed_call) - 1
+                    break
+            i += 1
+        return s
+
+    return transform_recursive(math_operation)
 
 def compile(input_file, output_file, encoding, eliminate_stop, optional_commands, drum_location):
     # Define global variables
@@ -249,6 +306,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n\n")
 
     # Two big functions for reading and printing doubles
+    output_file.write("void DRD(double num, int I, int J, int is_K, ...){ va_list args; va_start(args, is_K); int K = 0; float S = 0.0; K = va_arg(args, int); S = (float)va_arg(args, double); va_end(args); int minusI = S-S; int minusJ = 0; const char* formatTemplate; int printedLength = 0; if (I < 0) { minusI = 1; I = fabs(I); } if (J < 0) { minusJ = 1; J = fabs(J); } if (K < 0 && is_K == 1) { minusI = 1; K = fabs(K); } int totalWidth = I + J + 2; char format[30]; if (num >= 0 && minusI == 0 && minusJ != 1) { formatTemplate = \"%%+%d.%df\"; } else if (num >= 0 && minusI == 1) { formatTemplate = \" %%%d.%df\"; totalWidth -= 1; printedLength -= 1; } else { formatTemplate = \"%%%d.%df\"; } if (minusJ == 1) { snprintf(format, sizeof(format), \"%%%s%d.%df\", num < 0 ? \"-\" : \"0\", totalWidth, J); } else { snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } printedLength += snprintf(NULL, 0, format, num); if (printedLength > totalWidth) { snprintf(format, sizeof(format), \"%%%d.%dE\", totalWidth, J); } printf(format, num); }\n")
     output_file.write("int CZD(double* num) { char input[500]; char convert[500]; double tmp = 0.0; int erno = -1; int i = 0; fgets(input, sizeof(input), stdin); char* ptr = input; while (*ptr != '\\0' && *ptr != '\\n') { if (isdigit(*ptr) || *ptr == '.' || *ptr == '+' || *ptr == '-' || *ptr == 'E') { convert[i] = *ptr; i++; erno = *ptr; ptr++; } else { input[0] = -1; break; } } erno = encoding[erno]; if (input[0] == -1) { erno = -erno; } errno = 0; tmp = strtod(convert, &ptr); if (errno == ERANGE && tmp <= DBL_MIN) { erno = -(erno+64); } else if (errno == ERANGE && tmp == HUGE_VAL) { erno = -(erno+128); } *num = tmp; return erno; }\n\n")
 
     # DRUKUJ C function
@@ -280,13 +338,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_CZzB = False
     moved_List_DRO = False
     moved_List_CZO = False
+    moved_List_SW = False
+    moved_List_SW_index = -1
 
-    zline_zindex = 43
+    zline_zindex = 44
     error_line_index = 0
     for line in input_file:
         # Add one to index
         zline_zindex += 1
         error_line_index += 1
+        # Get rid of popular unnecessary characters
+        line = line.replace("\r", "").replace("\t", "")
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         # print(integers)
@@ -322,10 +384,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         beben_czytaj_c = line.find("CZYTAJZBEBNAOD")
         drukuj_oktalnie = line.find("DRUKUJOKTALNIE:")
         czytaj_oktalnie = line.find("CZYTAJOKTALNIE:")
-        if decimal_operation_c and not inside_TABLICA and not inside_TEKST and not jezyk_SAS:
-            t2 = re.sub(match_labels, "", line)
-            if re.search(r"^\s*\**\)", line): t2 = re.sub(r"^\**\)", "", line)
-            if t2.startswith("()="): line = line.replace("()=", "")
+        # if decimal_operation_c and not inside_TABLICA and not inside_TEKST and not jezyk_SAS:
+        #     t2 = re.sub(match_labels, "", line)
+        #     if re.search(r"^\s*\**\)", line): t2 = re.sub(r"^\**\)", "", line)
+        #     if t2.startswith("()="): line = line.replace("()=", "")
 
         ###############
         # Empty Lines #
@@ -380,7 +442,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             integers.extend(line)
             zline_zindex -= 1
             continue
-        if moved_List_B:
+        elif moved_List_B:
             line = line.split(",")
             for z, i in enumerate(line):
                 if i != "-":
@@ -394,7 +456,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     moved_List_B = True
                     break
             continue
-        if moved_List_DR:
+        elif moved_List_DR:
             t = line
             line = line_DR
             t2 = ""
@@ -425,7 +487,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             if t != "$":
                 moved_List_DR = False
             continue
-        if moved_List_CZW:
+        elif moved_List_CZW:
             line = line.split(",")
             for i in line:
                 if f"*{i}" not in integers:
@@ -447,7 +509,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             if line != "$":
                 moved_List_CZW = False
             continue
-        if moved_List_DRW:
+        elif moved_List_DRW:
             line = line.split(",")
             for i in line:
                 if f"*{i}" not in integers:
@@ -468,6 +530,25 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             zline_zindex -= 1
             if line != "$":
                 moved_List_DRW = False
+            continue
+        elif moved_List_SW != False:
+            line = line.split(",")
+            if line[-1] == "-":
+                moved_List_SW = True
+                line.pop()
+            else:
+                moved_List_SW = False
+            for i in line:
+                moved_List_SW_index += 1
+                output_file.write(f"        case {moved_List_SW_index}:\n")
+                if z == "NASTEPNY":
+                    output_file.write(f"            break; //goto _NASTEPNY;\n")
+                else:
+                    output_file.write(f"            goto _{i[:4]};\n")
+            if not moved_List_SW:
+                output_file.write("    }\n")
+                moved_List_SW_index = -1
+            zline_zindex += (len(line)*2)
             continue
 
         ##########
@@ -515,25 +596,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # TEKST #
         #########
-        if start != -1 and line.find("WIERSZY") == -1 and not inside_TABLICA:
+        if start != -1 and line.find("WIERSZY") != 5 and not inside_TABLICA:
             tek_wie = -1
             inside_TEKST = True
-            start += len("TEKST")
-
-            # Skip spaces
-            while start < len(line) and line[start].isspace():
-                start += 1
-
-            # Check for optional colon
-            if start < len(line) and line[start] == ':':
-                start += 1
-                # Skip spaces after colon
-                while start < len(line) and line[start].isspace():
-                    start += 1
-
-            # Remove the last symbol from start
-            start = start if len(line) <= start else start - 1
-            line = line[:start] + line[start+1:]
             zline_zindex -= 1
             continue
         elif inside_TEKST:
@@ -550,11 +615,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     line = line.replace("\n", "")
                 output_file.write(f'    printf("{line}");\n')
             continue
-        elif start != -1 and line.find("WIERSZY") != -1 and not inside_TABLICA:
+        elif start != -1 and line.find("WIERSZY") == 5 and not inside_TABLICA:
             tek_wie2 = True
             tek_wie = 0
-            line = line.replace(" ", "").replace("TEKST", "").replace("\n", "").replace("WIERSZY", "").replace(":", "")
-            tek_wie = int(eval(line.replace("*", "**").replace("×", "*").replace('⋄', '*'), restricted_eval))
+            line = line[12:].replace(":", "")
+            line = line.replace("*", "**").replace("×", "*").replace('⋄', '*')
+            if any(char.isalpha() for char in line):
+                return 7, error_line_index, last_label
+            try:
+                tek_wie = int(eval(line, restricted_eval))
+            except Error as e:
+                return 7, error_line_index, last_label
             inside_TEKST = True
             zline_zindex -= 1
             continue
@@ -578,13 +649,20 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             t = line[1].split(",")
             variable = line[0].replace("(", "").replace(")", "")
             output_file.write("    switch (" + variable + ") {\n")
+            if t[-1] == "-":
+                moved_List_SW = True
+                t.pop()
             for i, z in enumerate(t):
                 output_file.write(f"        case {i}:\n")
                 if z == "NASTEPNY":
                     output_file.write(f"            break; //goto _NASTEPNY;\n")
                 else:
                     output_file.write(f"            goto _{t[i][:4]};\n")
-            output_file.write("    }\n")
+            if moved_List_SW:
+                moved_List_SW_index = i
+                zline_zindex -= 1
+            else:
+                output_file.write("    }\n")
             zline_zindex += (len(t)*2) + 1
             continue
 
@@ -746,8 +824,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     count -= 1
                     zline_zindex += 1
                 continue
-
-            if len(line) >= 3 and count != True:
+            if len(line) >= 3 and count != True and line.split("=")[0]=="()":
+                line = line.split("=")
+                operation = process_math_operation(line[1])
+                output_file.write(f"    {operation};\n")
+                continue
+            elif len(line) >= 3 and count != True:
                 is_float = ""
                 whole = line.split("=")
                 variable = whole[0]
@@ -802,7 +884,13 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             line = line[0]
             line = line.split(",")
             for i in line:
-                i = str(eval(str(i.replace("*", "**").replace("×", "*").replace('⋄', '*')) + "+1", restricted_eval))
+                i = i.replace("*", "**").replace("×", "*").replace("⋄", "*") + "+1"
+                if any(char.isalpha() for char in i):
+                    return 27, error_line_index, last_label
+                try:
+                    i = eval(i, restricted_eval)
+                except Error as e:
+                    return 27, error_line_index, last_label
                 t.append(f"[{i}]")
             line = ""
             for i in t:
@@ -824,11 +912,18 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###########
         # TABLICA #
         ###########
+        # TODO: Add error detection for amount of declared and given elements
         if tablica_c != -1:
             line = line.replace("TABLICA(", "").replace(")", "").split(":")
             TABLICA_numbers = line[0].split(",")
             for i in range(len(TABLICA_numbers)):
-                TABLICA_numbers[i] = int(eval((TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*").replace('⋄', '*'), restricted_eval))
+                TABLICA_numbers[i] = (TABLICA_numbers[i]+"+1").replace("*", "**").replace("×", "*").replace('⋄', '*')
+                if any(char.isalpha() for char in TABLICA_numbers[i]):
+                    return 27, error_line_index, last_label
+                try:
+                    TABLICA_numbers[i] = int(eval(TABLICA_numbers[i], restricted_eval))
+                except Error as e:
+                    return 27, error_line_index, last_label
             TABLICA_name = line[1][:4]
             t = ""
             used_variables.append(TABLICA_name)
