@@ -2,7 +2,7 @@ Simple SAKO Compiler
 ========
 
 ## What is this
-This is a very simple and basic SAKO to C compiler. I have no experience writing transpilers, and didn't do any research. You can consider it as having a basic understanding of SAKO at the A1 proficiency level. It's slow, but it's Python, so what would you expect? GCC needed for compilation to a binary file. May create warnings, usually not harmful (especially a lot when working with doubles).
+This is a very simple and basic SAKO to C compiler. I have no experience writing transpilers, and didn't do any research. You can consider it as having a basic understanding of SAKO at the A1 proficiency level. It's slow, but it's Python, so what would you expect? GCC needed for compilation to a binary file.
 
 ## Supported features
 - Basic mathematical operations and variable assigning
@@ -18,16 +18,17 @@ This is a very simple and basic SAKO to C compiler. I have no experience writing
 - Somewhat intuitive drum storage based on text (With my innovation — writing constants to it)
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
 - `JEZYK SAS` and `JEZYK SAKO` declarations
+- Numbers of type "double"
 
 ## More notable NOT supported features
 - User defined subroutines
 - Changing array's size using `STRUKTURA`
 - `ROZDZIAL` declarations
-- Numbers of type "double"
 - ANY binary and octal operations
-- Weird loop notation, like `1A)**)*`
+- Unconvencional loop notation, like `1A)**)*`
 - Magnetic tape storage
 - Extensive subroutines utilisation using `PODSTAW`
+- Manipulation and utilisation of chosen devices
 
 ## Usage
 
