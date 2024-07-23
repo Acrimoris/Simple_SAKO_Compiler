@@ -26,6 +26,9 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     if math_operation == "()":
         return ""
 
+    # Replace variables with four characters
+    math_operation = re.sub(r'\b([A-Z]+([0-9]*[A-Z]*)*)\b', lambda match: match.group(1)[:4], math_operation)
+
     # Get rid of preceding zeros to avoid accidental octals
     # Use regex to find numbers and remove leading zeros
     math_operation = re.sub(r'\b0+(\d)', r'\1', math_operation)
@@ -840,8 +843,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 if operation[:2] == "(*" and operation[-1] == ")":
                     operation = f"(*{operation[2:][:-1][:4]})"
                 operation = process_math_operation(operation, user_functions)
-                if variable[0] != "(" and variable[-1] != ")":
-                    vart = re.sub(r'\[.*?\]', '', variable)[:4]
+                vart = re.sub(r'\[.*?\]', '', variable)[:4]
                 if variable[0] != "*":
                     is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                     if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
