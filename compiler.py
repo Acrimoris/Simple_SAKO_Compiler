@@ -31,7 +31,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     # Get rid of preceding zeros to avoid accidental octals
     # Use regex to find numbers and remove leading zeros
-    math_operation = re.sub(r'\b0+(\d)', r'\1', math_operation)
+    math_operation = re.sub(r'(?<!\.)\b0+(\d+)\b', r'\1', math_operation)
 
     # Handle square brackets
     math_operation = handle_square_brackets(math_operation)
@@ -128,7 +128,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
         if x[0] == "(" and y[-1] == ")":
             x = x[1:]
             y = y[:-1]
-        math_operation = math_operation.replace(f"{x}${y}", f"pow({x},{y})")
+        math_operation = math_operation.replace(f"{x}${y}", f"pow({x}, {y})")
 
     # Replace SAKO functions with C functions
     if any(sub in math_operation for sub in SAKO_functions):
@@ -144,7 +144,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
             break
         index = math_operation.find(substring)
         while index != -1:
-            if index + len(substring) < len(math_operation) and math_operation[index + len(substring)] != '[' and math_operation[index + len(substring)] in operations_list and (math_operation[index - 1] != "(" and math_operation[index - 2] != "m" and math_operation[index - 3] != "l" and math_operation[index - 4] != "e") and (math_operation[index-1] != "&" and (math_operation[index-1] != ")" and math_operation[index-2] != "*" and math_operation[index-3] != "e" and math_operation[index-3] != "l")):
+            if index + len(substring) < len(math_operation) and math_operation[index + len(substring)] != '[' and math_operation[index + len(substring)] in operations_list and not math_operation[index-1].isalpha() and (math_operation[index - 1] != "(" and math_operation[index - 2] != "m" and math_operation[index - 3] != "l" and math_operation[index - 4] != "e") and (math_operation[index-1] != "&" and (math_operation[index-1] != ")" and math_operation[index-2] != "*" and math_operation[index-3] != "e" and math_operation[index-3] != "l")):
                 math_operation = math_operation[:index] + '*' + math_operation[index:]
             index = math_operation.find(substring, index + 2)
 
