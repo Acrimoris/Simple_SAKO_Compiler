@@ -34,9 +34,7 @@ This is a very simple and basic SAKO to C compiler. I have no experience writing
 
 ```
 $ python3 compiler.py --help
-usage: compiler.py [-h] [-en {KW6|ASCII|Ferranti}] [-d] [-Wall] [-g] [-nc] [-es] [-ot]
-                   [-dl {/path/to/file}]
-                   input_filename
+usage: compiler.py [-h] [-en {KW6|ASCII|Ferranti}] [-d] [-Wall] [-g] [-nc] [-es] [-ot] [-dl {/path/to/file}] [-o output_file] input_filename
 
 Compile SAKO to C.
 
@@ -53,12 +51,13 @@ options:
   -g                    Turn on -g flag while compiling using GCC.
   -nc, --no-compiling   Turn off compiling C code using GCC.
   -es, --eliminate-stop
-                        Change STOP command to wait for input and restart from the given
-                        label, instead of stopping the programme.
+                        Change STOP command to wait for input and restart from the given label, instead of stopping the programme.
   -ot, --optional-translation
                         Turn on compiling optional commands.
   -dl {/path/to/file}, --drum-location {/path/to/file}
                         Specify the location of the drum file.
+  -o output_file, --output output_file
+                        Specify the name of the output file.
 ```
 - To use keys in your SAKO program, declare them at the start of the executable using the "-k" command line option. Specify the numbers of keys to turn on, separated by commas. Example: "./program -k 0,5,6,34" This command turns on keys with numbers 0, 5, 6, and 34.
 - The drum storage is maintained as plain text, with entries separated by newline characters. Notably, both real and integer numbers occupy the same amount of space, eliminating any distinction in size between the two.
