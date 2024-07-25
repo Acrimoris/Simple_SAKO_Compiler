@@ -134,7 +134,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     if any(sub in math_operation for sub in SAKO_functions):
         pairs = zip(SAKO_functions, C_functions)
         sorted_pairs = sorted(pairs, key=lambda x: len(x[0]), reverse=True)
-        math_operation = reduce(lambda s, pair: s.replace(pair[0], pair[1]), sorted_pairs, math_operation)
+        math_operation = reduce(lambda s, pair: s.replace(f"{pair[0]}(", f"{pair[1]}("), sorted_pairs, math_operation)
 
     # Replace `array_name` with `*array_name` when no index is given
     operations_list="×⋄-+/,])"
@@ -557,7 +557,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # LABELS #
         ##########
-        if label_c and not inside_TABLICA and not inside_TEKST:
+        if label_c and not inside_TABLICA and not inside_TEKST and not jezyk_SAS:
             t = re.search(match_labels, line) or re.search(r"^\**\)", line)
             t = t.group(0).replace(")", "")
             t2 = t.replace("*", "")
@@ -1596,6 +1596,7 @@ def main():
     parser.add_argument('-es', '--eliminate-stop', action='store_true', help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
     parser.add_argument('-ot', '--optional-translation', action='store_true', help='Turn on compiling optional commands.')
     parser.add_argument('-dl', '--drum-location', metavar='{/path/to/file}', default='drum.txt', help='Specify the location of the drum file.')
+    parser.add_argument('-o', '--output', metavar='output_file', default='', help='Specify the name of the output file.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -1608,13 +1609,15 @@ def main():
     eliminate_stop = args.eliminate_stop
     opt_comm = args.optional_translation
     drum_location = args.drum_location
+    output_filename = args.output
 
     if not os.path.isfile(input_filename):
         print(f"{input_filename}: cannot open '{input_filename}': No such file or directory")
         sys.exit(1)
 
     # Create the output filename without the extension
-    output_filename = os.path.splitext(input_filename)[0]
+    if output_filename == "":
+        output_filename = os.path.splitext(input_filename)[0]
 
     # Add ".tmp" extension
     tmp_b = ".tmp" * (not nc)
@@ -1629,12 +1632,9 @@ def main():
             if result != 0:
                 print(f"{label} {error_index} BLAD {result} GLOW")
                 return 1;
-            # print("Now only loops left!!")
         with open(tmp_output_filename, "r+") as file:
             lines = file.readlines()
-            # print(loop_labels2)
             for i in reversed(loop_labels2):
-                # print(i)
                 loops -= 1
                 i[2] = f"{i[2]}    LS{loops}: ;\n"
                 lines.insert(i[1]-1, i[2])
