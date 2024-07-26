@@ -17,7 +17,7 @@ def is_number(s):
 
 def process_math_operation(math_operation: str, user_functions=[]) -> str:
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "fabs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "sako_abs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
     double_functions = ["DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     read_double = "CZD"
     print_double = "DRD"
@@ -27,6 +27,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
         return ""
 
     # Replace variables with four characters
+    # Definitely will need reworking in the future
     math_operation = re.sub(r'\b([A-Z]+([0-9]*[A-Z]*)*)\b', lambda match: match.group(1)[:4], math_operation)
 
     # Get rid of preceding zeros to avoid accidental octals
@@ -45,7 +46,11 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     #
     # Handle doubles being assigned a value
     operations_list = "+-/×⋄$"
-    if math_operation[:2] == "($" and math_operation[-1:] == ")" and not any(char in operations_list for char in math_operation[2:][:-1]) and len(math_operation) <=7 and math_operation[2:][:-1] in array_names:
+    if (math_operation[:2] == "($"
+            and math_operation[-1:] == ")"
+            and not any(char in operations_list for char in math_operation[2:][:-1])
+            and len(math_operation) <=7
+            and math_operation[2:][:-1] in array_names):
         math_operation = math_operation[2:][:-1]
         math_operation = f"*((double*){math_operation})"
     # Handle doubles in functions
@@ -72,7 +77,6 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
             math_operation = ",".join(math_operation)
 
     # Handle "to the power of" operations
-    # Temporarily disabled, waiting for doubles.
     while "$" in math_operation:
         t = math_operation.split("$", 1)
         operations_list="()×⋄-+/[],"
@@ -144,7 +148,21 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
             break
         index = math_operation.find(substring)
         while index != -1:
-            if index + len(substring) < len(math_operation) and math_operation[index + len(substring)] != '[' and math_operation[index + len(substring)] in operations_list and not math_operation[index-1].isalpha() and (math_operation[index - 1] != "(" and math_operation[index - 2] != "m" and math_operation[index - 3] != "l" and math_operation[index - 4] != "e") and (math_operation[index-1] != "&" and (math_operation[index-1] != ")" and math_operation[index-2] != "*" and math_operation[index-3] != "e" and math_operation[index-3] != "l")):
+            if (index + len(substring) < len(math_operation)
+                    and math_operation[index + len(substring)] != '['
+                    and math_operation[index + len(substring)] in operations_list
+                    and not math_operation[index-1].isalpha()
+                    and (math_operation[index - 1] != "("
+                        and math_operation[index - 2] != "m"
+                        and math_operation[index - 3] != "l"
+                        and math_operation[index - 4] != "e")
+                    and (math_operation[index-1] != "&"
+                        and (math_operation[index-1] != ")"
+                            and math_operation[index-2] != "*"
+                            and math_operation[index-3] != "e"
+                            and math_operation[index-3] != "l")
+                        )
+                    ):
                 math_operation = math_operation[:index] + '*' + math_operation[index:]
             index = math_operation.find(substring, index + 2)
 
@@ -155,7 +173,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     return math_operation
 
 def handle_square_brackets(math_operation: str) -> str:
-    operations_list = "+-/×⋄*"
+    operations_list = "+-/×⋄*,"
     new_operation = ""
     part = ""
     count_p = 0
@@ -281,6 +299,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
     output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
+    output_file.write("#define sako_abs(X) _Generic((X), int: abs, float: fabsf)(X)\n")
 
     # Add macros and functions for double numbers
     output_file.write("#define GET_MACRO(_1,_2,_3,NAME,...) NAME\n")
@@ -344,24 +363,25 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_SW = False
     moved_List_SW_index = -1
 
-    zline_zindex = 44
+    zline_zindex = 45
     error_line_index = 0
     for line in input_file:
         # Add one to index
         zline_zindex += 1
         error_line_index += 1
-        # Get rid of popular unnecessary characters
-        line = line.replace("\r", "").replace("\t", "")
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
-        # print(integers)
+        #print(integers)
+        # Get rid of popular unnecessary characters
+        line = line.replace("\r", "").replace("\t", "")
         # Make line case insensitive
-        if not inside_TEKST and not jezyk_SAS: line = line.upper()
+        if not inside_TEKST and not jezyk_SAS:
+            line = line.upper()
+        # Get rid of unnecessary whitespace
         if not inside_TEKST and not jezyk_SAS and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "")
         # Check for SAKO keywords
-        # "start" stays, as I started with this keyword
-        start = line.find("TEKST")
+        tekst_c = line.find("TEKST")
         calkowite_c = line.find("CALKOWITE:")
         decimal_operation_c = line.find("=")
         octal_operation_c = line.find("[") if line.find("[") != -1 else line.find("≡")
@@ -387,19 +407,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         beben_czytaj_c = line.find("CZYTAJZBEBNAOD")
         drukuj_oktalnie = line.find("DRUKUJOKTALNIE:")
         czytaj_oktalnie = line.find("CZYTAJOKTALNIE:")
-        # if decimal_operation_c and not inside_TABLICA and not inside_TEKST and not jezyk_SAS:
-        #     t2 = re.sub(match_labels, "", line)
-        #     if re.search(r"^\s*\**\)", line): t2 = re.sub(r"^\**\)", "", line)
-        #     if t2.startswith("()="): line = line.replace("()=", "")
 
         ###############
         # Empty Lines #
         ###############
-        if line == "" and inside_TEKST == False and not inside_TABLICA:
+        if line == "" and not inside_TEKST and not inside_TABLICA:
             zline_zindex -= 1
             error_line_index -= 1
             continue
-        if line.find("STRUKTURA") != -1 and inside_TEKST == False and not inside_TABLICA and not comment_c:
+        if line.find("STRUKTURA") != -1 and not inside_TEKST and not inside_TABLICA and not comment_c:
             zline_zindex -= 1
             error_line_index -= 1
             continue
@@ -407,10 +423,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############
         # COMMENTS #
         ############
-        if comment_c and inside_TEKST == False and not inside_TABLICA and not jezyk_SAS:
+        if comment_c and not inside_TEKST and not inside_TABLICA and not jezyk_SAS:
             zline_zindex -= 1
             continue
-        if (line.startswith("USTAWSKALE") or line.startswith("ZWIEKSZSKALE") or line.startswith("SKALA") or line == "KONIECROZDZIALU") and not inside_TABLICA and not inside_TEKST:
+        # TODO: Make more variable name friendly
+        if (    (line.startswith("USTAWSKALE")
+                or line.startswith("ZWIEKSZSKALE")
+                or line.startswith("SKALA")
+                or line == "KONIECROZDZIALU")
+                and not inside_TABLICA and not inside_TEKST and decimal_operation_c == -1 and octal_operation_c == -1):
             zline_zindex -= 1
             continue
         if ";" in line and not jezyk_SAS:
@@ -419,7 +440,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ########################
         # Optional translation #
         ########################
-        if (line.startswith("'") or line.startswith("?")) and inside_TEKST == False and not inside_TABLICA:
+        if (line.startswith("'") or line.startswith("?")) and not inside_TEKST and not inside_TABLICA:
             if optional_commands:
                 line = line.replace("?", "")
             else:
@@ -567,7 +588,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 last_label = t2
                 error_line_index = -1
             else:
-                #output_file.write(f"    LX{loops_wol}:\n")
                 t = "*" * t.count("*") + f"LX{loops_wol}"
                 loops_wol += 1
                 zline_zindex -= 1
@@ -582,7 +602,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############################
         # JEZYK SAS and JEZYK SAKO #
         ############################
-        if line == "JEZYKSAS" and inside_TEKST == False and not inside_TABLICA:
+        if line == "JEZYKSAS" and not inside_TEKST and not inside_TABLICA:
             jezyk_SAS = True
             output_file.write("    __asm__ volatile (\n")
             continue
@@ -590,7 +610,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             jezyk_SAS = False
             output_file.write("    );\n")
             continue
-        elif line.replace(" ", "").replace("\n", "") == "JEZYKSAKO" and not jezyk_SAS:
+        elif line == "JEZYKSAKO" and not jezyk_SAS and not inside_TEKST and not inside_TABLICA:
             return 29, error_line_index, last_label
         elif jezyk_SAS:
             output_file.write(f'        {line}')
@@ -599,7 +619,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # TEKST #
         #########
-        if start != -1 and line.find("WIERSZY") != 5 and not inside_TABLICA:
+        if tekst_c != -1 and line.find("WIERSZY") != 5 and not inside_TABLICA:
             tek_wie = -1
             inside_TEKST = True
             zline_zindex -= 1
@@ -618,7 +638,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     line = line.replace("\n", "")
                 output_file.write(f'    printf("{line}");\n')
             continue
-        elif start != -1 and line.find("WIERSZY") == 5 and not inside_TABLICA:
+        elif tekst_c != -1 and line.find("WIERSZY") == 5 and not inside_TABLICA:
             tek_wie2 = True
             tek_wie = 0
             line = line[12:].replace(":", "")
@@ -638,10 +658,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         if jump_to != -1 and not inside_TABLICA:
             line = line.replace("SKOCZDO", "").replace(":", "")[:4]
-            if line != "NASTEPNY":
-                output_file.write(f"    goto _{line};\n")
-            else:
-                zline_zindex -= 1
+            t = "//" * (line == "NAST")
+            output_file.write(f"    {t}goto _{line};\n")
             continue
 
         ##########################
@@ -678,7 +696,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             line = line.split(":")[1]
             variable = line.split("=")[0]
             line = line.split("=")[1]
-            operations_list = ["+", "-", "/", "×", "*"]
+            operations_list = "+-/×⋄*"
             count = 0
             t = []
             t2 = []
@@ -712,24 +730,24 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             end = process_math_operation(end)
 
             # print(variable, start_loop, step, end)
-            used =  "float" * ((variable not in integers) and (variable not in used_variables)) + "int" * (variable not in used_variables) * (variable in integers)
+            used =  "float " * ((variable not in integers) and (variable not in used_variables)) + "int " * (variable not in used_variables) * (variable in integers)
             if len(loop_labels2[len(loop_labels2)-1]) != 3:
-                loop_labels2[len(loop_labels2)-1].append(f"    {used} {variable} = {start_loop};\n")
+                loop_labels2[len(loop_labels2)-1].append(f"    {used}{variable} = {start_loop};\n")
             else:
                 for i in reversed(loop_labels2):
                     if len(i) != 3:
-                        i.append(f"    {used} {variable} = {start_loop};\n")
+                        i.append(f"    {used}{variable} = {start_loop};\n")
                         break
             # print(loop_labels2)
             if variable not in used_variables: used_variables.append(variable)
             if variable in integers:
-                output_file.write("    if (" + str(variable) + " != " + str(end) + ") {\n")
+                output_file.write(f"    if ({variable} != {end}) {{\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {label1};\n")
                 output_file.write("    }\n")
                 zline_zindex += 3
             else:
-                output_file.write("    if (fabs(" + str(step) + "/2.0) <= fabs(" + str(variable)  + "-(" + str(end) + "))) {\n")
+                output_file.write(f"    if (fabs({step}/2.0) <= fabs({variable}-({end}))) {{\n")
                 output_file.write(f"        {variable} = {variable} + {step};\n")
                 output_file.write(f"        goto {label1};\n")
                 output_file.write("    }\n")
@@ -759,7 +777,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ########################
         # Variables Definition #
         ########################
-        if decimal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
+        if decimal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and not inside_TABLICA:
             count = 0
             for i in line:
                 if i == "(":
@@ -845,12 +863,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 operation = process_math_operation(operation, user_functions)
                 vart = re.sub(r'\[.*?\]', '', variable)[:4]
                 if variable[0] != "*":
-                    is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                    is_float = "float " * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int " * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                     if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
-                output_file.write(f"    {is_float} {variable} = {operation};\n")
+                output_file.write(f"    {is_float}{variable} = {operation};\n")
                 continue
 
-        if octal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and inside_TABLICA == False:
+        if octal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and not inside_TABLICA:
             line = line.split("[")
             variable = line[0]
             operation = line[1]
@@ -873,9 +891,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
 
             vart = re.sub(r'\[.*?\]', '', variable)[:4]
             if variable[0] != "*":
-                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
+                is_float = "float " * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int " * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                 if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
-            output_file.write(f"    {is_float} {variable} = {operation};\n")
+            output_file.write(f"    {is_float}{variable} = {operation};\n")
             continue
 
 
@@ -1028,7 +1046,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # STRONA #
         ##########
-        if strona_c != -1:
+        if strona_c != -1 and line == "STRONA":
             output_file.write("    printf(\"\\f\");\n")
             continue
 
@@ -1103,8 +1121,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 vart = re.sub(r'\[.*?\]', '', i)
                 if "*" in i:
                     i = "*" + i.replace("*", "")[:4]
-                    is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float = is_float2[0]
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
                     if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
                     i = i.replace("*", "")
@@ -1145,7 +1163,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     i = process_math_operation(i)
                     vart = re.sub(r'\[.*?\]', '', i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
-                    is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = is_float[0]
                     spacePtr = "char* " if "spacePtr" not in used_variables else ""
                     if "spacePtr" not in used_variables: used_variables.append("spacePtr")
                     if  (i not in used_variables) and (vart not in used_variables):
@@ -1233,18 +1251,18 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 vart = re.sub(r'\[.*?\]', '', variable)[:4]
                 is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
                 if "octal_index" not in used_variables:
-                    is_float2 = "int"
+                    is_float2 = "int "
                 else:
                     is_float2 = ""
                     used_variables.append("octal_index")
                 if "octal_parts" not in used_variables:
-                    is_float3 = "char"
+                    is_float3 = "char "
                 else:
                     is_float3 = ""
                     used_variables.append("octal_parts")
                 if is_float == "int":
-                    output_file.write(f"    {is_float3} octal_parts[4][4];\n")
-                    output_file.write(f"    {is_float2} octal_index = 0;\n")
+                    output_file.write(f"    {is_float3}octal_parts[4][4];\n")
+                    output_file.write(f"    {is_float2}octal_index = 0;\n")
                     output_file.write(f"    while ({i} > 0 || octal_index < 4) {{\n")
                     output_file.write(f"        int part = {i} % 0100;\n")
                     output_file.write(f"        {i} /= 0100;\n")
@@ -1310,6 +1328,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line.replace("GDYBYLNADMIAR:", "")
                 label1 = line[:4]
                 t = "//" * (label2 == "NAST")
+                # TODO: Add NADMIAR detection
                 # There is no detection for that right now, so it's just goto
                 output_file.write(f"    {t}goto _{label2};\n")
                 continue
@@ -1361,17 +1380,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line = line.split(",")
                 zline_zindex -= 19
             if not moved_List_PnB:
-                FILE = "FILE *" * ("file" not in used_variables) + ""
-                FILE2 = "FILE *" * ("file2" not in used_variables) + ""
+                FILE = "FILE * " * ("file" not in used_variables)
+                FILE2 = "FILE * " * ("file2" not in used_variables)
                 if "file" not in used_variables: used_variables.append("file")
                 if "file2" not in used_variables: used_variables.append("file2")
-                output_file.write(f"    {FILE} file = fopen(\"{drum_location}\", \"r\");\n")
+                output_file.write(f"    {FILE}file = fopen(\"{drum_location}\", \"r\");\n")
                 output_file.write("    if (file == NULL) {\n")
                 output_file.write(f"        file = fopen(\"{drum_location}\", \"w\");\n")
                 output_file.write("        fclose(file);\n")
                 output_file.write(f"        file = fopen(\"{drum_location}\", \"r\");\n")
                 output_file.write("    }\n")
-                output_file.write(f"    {FILE2} file2 = fopen(\"{drum_location}.tmp\", \"w\");\n")
+                output_file.write(f"    {FILE2}file2 = fopen(\"{drum_location}.tmp\", \"w\");\n")
                 output_file.write("    if (file == NULL) {\n")
                 output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
                 output_file.write("        return 1;\n")
@@ -1397,8 +1416,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             for i in line:
                 if i.startswith("*"):
                     is_float = "f" * (i not in integers) + "i" * (i in integers)
-                    is_float2 = ("float*" * (i not in integers) + "int*" * (i in integers)) * (i not in used_variables) + ""
-                    is_float3 = "f" * (i not in integers) + "d" * (i in integers)
+                    is_float2 = ("float*" * (is_float == "f") + "int*" * (is_float == "i")) * (i not in used_variables)
+                    is_float3 = "f" * (is_float == "f") + "d" * (is_float == "i")
                     if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
                     ptr = f"{is_float2} ptr{is_float}"
                     output_file.write(f"    {ptr} = {i[1:]};\n")
@@ -1412,6 +1431,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     i = process_math_operation(i)
                     # Added option to write constants, not only variables :)
                     # Just some innovation
+                    # Maybe will remove later
                     t = is_number(i)
                     if t == "float":
                         is_float = "f"
@@ -1449,9 +1469,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 zline_zindex -= 8
 
             if not moved_List_CZzB:
-                FILE = "FILE *" * ("file" not in used_variables) + ""
+                FILE = "FILE * " * ("file" not in used_variables)
                 if "file" not in used_variables: used_variables.append("file")
-                output_file.write(f"    {FILE} file = fopen(\"{drum_location}\", \"r\");\n")
+                output_file.write(f"    {FILE}file = fopen(\"{drum_location}\", \"r\");\n")
                 output_file.write("    if (file == NULL) {\n")
                 output_file.write("        printf(\"Error: Unable to access drum storage.\\n\");\n")
                 output_file.write("        return 1;\n")
@@ -1475,8 +1495,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 if "*" in i:
                     i = i.replace("*", "")
                     i = process_math_operation(i)
-                    is_float = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float = is_float2[0]
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
                     if f"ptr{is_float}" not in used_variables: used_variables.append(f"ptr{is_float}")
                     output_file.write(f"    {ptr} = (void*){i};\n")
@@ -1513,15 +1533,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     i = process_math_operation(i)
                     vart = re.sub(r'\[.*?\]', '', i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i in integers) or (f"*{vart}" in integers))
-                    is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
+                    is_float2 = "f" * (is_float == "float") + "i" * (is_float == "int")
                     spacePtr = "char* " if "spacePtr" not in used_variables else ""
-                    if "spacePtr" not in used_variables: used_variables.append(f"spacePtr")
+                    if "spacePtr" not in used_variables: used_variables.append("spacePtr")
                     if  (i not in used_variables) and (vart not in used_variables):
                         output_file.write(f"    {is_float} {i};\n")
                         used_variables.append(vart)
                         zline_zindex += 1
                     output_file.write("    fgets(input, sizeof(input), file);\n")
-                    output_file.write(f"    {spacePtr} spacePtr = strchr(input, ' ');\n")
+                    output_file.write(f"    {spacePtr}spacePtr = strchr(input, ' ');\n")
                     output_file.write("    while (spacePtr) {\n")
                     output_file.write("        memmove(spacePtr, spacePtr + 1, strlen(spacePtr));\n")
                     output_file.write(f"        spacePtr = strchr(input, ' ');\n")
@@ -1548,7 +1568,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         if stop != -1:
             if eliminate_stop:
                 line = line[4:]
-                t = "//" * (line == "NASTEPNY") + ""
+                t = "//" * (line == "NASTEPNY")
                 line = line[:4]
                 output_file.write("    fgets(input, sizeof(input), stdin);\n")
                 output_file.write(f"    {t}goto _{line};\n")
@@ -1585,6 +1605,7 @@ def main():
     loop_labels2 = []
     loops = 0
     array_names = []
+
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename', help='Name of the input file')
@@ -1607,7 +1628,7 @@ def main():
     g_flag = args.g
     nc = args.no_compiling
     eliminate_stop = args.eliminate_stop
-    opt_comm = args.optional_translation
+    opt_trans = args.optional_translation
     drum_location = args.drum_location
     output_filename = args.output
 
@@ -1615,20 +1636,19 @@ def main():
         print(f"{input_filename}: cannot open '{input_filename}': No such file or directory")
         sys.exit(1)
 
-    # Create the output filename without the extension
+    # Create the output filename
     if output_filename == "":
         output_filename = os.path.splitext(input_filename)[0]
-
-    # Add ".tmp" extension
-    tmp_b = ".tmp" * (not nc)
-    tmp_output_filename = output_filename + f"{tmp_b}.c"
+    tmp_b = ".tmp.c" * (not nc)
+    tmp_output_filename = output_filename + f"{tmp_b}"
 
     try:
         tmp = open(tmp_output_filename, 'w')
         tmp.close()
         with open(input_filename, 'r') as input_file, open(tmp_output_filename, 'r+') as output_file:
             output_file.truncate()
-            result, error_index, label = compile(input_file, output_file, encoding, eliminate_stop, opt_comm, drum_location)
+            result, error_index, label = compile(input_file, output_file,
+                                                encoding, eliminate_stop, opt_trans, drum_location)
             if result != 0:
                 print(f"{label} {error_index} BLAD {result} GLOW")
                 return 1;
