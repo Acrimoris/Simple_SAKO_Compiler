@@ -342,9 +342,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     # Input variable
     output_file.write("    char input[120];\n")
 
-    # Define regexes patterns
-    match_labels = r"^\s*\**[0-9]+[A-Z]*([0-9]*[A-Z]*)*\)"
-
     # Define boolean variables
     jezyk_SAS = False
     inside_TEKST = False
@@ -366,12 +363,18 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     zline_zindex = 45
     error_line_index = 0
     for line in input_file:
-        # Add one to index
-        zline_zindex += 1
-        error_line_index += 1
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
         #print(integers)
+
+        ###################################
+        # Preparation for line processing #
+        ###################################
+
+        # Add one to index
+        zline_zindex += 1
+        error_line_index += 1
+
         # Get rid of popular unnecessary characters
         line = line.replace("\r", "").replace("\t", "")
         # Make line case insensitive
@@ -380,50 +383,87 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # Get rid of unnecessary whitespace
         if not inside_TEKST and not jezyk_SAS and not inside_TABLICA:
             line = line.replace(" ", "").replace("\n", "")
-        # Check for SAKO keywords
-        tekst_c = line.find("TEKST")
-        calkowite_c = line.find("CALKOWITE:")
-        decimal_operation_c = line.find("=")
-        octal_operation_c = line.find("[") if line.find("[") != -1 else line.find("≡")
-        stop = line.find("STOP")
-        koniec = line.find("KONIEC")
-        jump_to = line.find("SKOCZDO")
-        comment_c = line.startswith("K)") or line.startswith(":")
-        spaces = line.find("SPACJA") if line.find("SPACJA") != -1 else line.find("SPACJI")
-        newlines = line.find("LINIA") if line.find("LINIA") != -1 else line.find("LINII")
-        gdy_c = line.find("GDY")
-        gdy_inaczej_c = line.find(",INACZEJ")
-        drukuj_c = line.find("DRUKUJ(")
-        blok_c = line.find("BLOK(")
-        tablica_c = line.find("TABLICA(")
-        if not inside_TABLICA: label_c = re.match(match_labels, line) or re.match(r"^\**\)", line)
-        czytaj = line.find("CZYTAJ:")
-        loop_c = line.find("POWTORZ")
-        skocz_wedlug = line.find("SKOCZWEDLUG")
-        drukuj_wiersz = line.find("DRUKUJWIERSZ:")
-        czytaj_wiersz = line.find("CZYTAJWIERSZ:")
-        strona_c = line.find("STRONA")
-        beben_pisz_c = line.find("PISZNABEBENOD")
-        beben_czytaj_c = line.find("CZYTAJZBEBNAOD")
-        drukuj_oktalnie = line.find("DRUKUJOKTALNIE:")
-        czytaj_oktalnie = line.find("CZYTAJOKTALNIE:")
 
         ###############
         # Empty Lines #
         ###############
-        if line == "" and not inside_TEKST and not inside_TABLICA:
-            zline_zindex -= 1
-            error_line_index -= 1
-            continue
-        if line.find("STRUKTURA") != -1 and not inside_TEKST and not inside_TABLICA and not comment_c:
+        if line == "" and not inside_TEKST and not inside_TABLICA and not jezyk_SAS:
             zline_zindex -= 1
             error_line_index -= 1
             continue
 
+        ##########
+        # LABELS #
+        ##########
+        if (line[0].isdigit() or line[0] == "*") and ")" in line and (not inside_TEKST
+                and not inside_TABLICA and not jezyk_SAS and not moved_List_SW):
+            t = ""
+            t2 = 0
+            for z, i in enumerate(line):
+                #print(z, i, t, t2, zline_zindex)
+                if i == ")":
+                    if t != "":
+                        t = t[:4]
+                        output_file.write(f"    _{t}: ;\n")
+                        last_label = t
+                        error_line_index = -1
+                        zline_zindex += 1
+                        t = ""
+                    if line[z+1].isdigit() or line[z+1] == "*":
+                        continue
+                    else:
+                        break
+                elif i == "*":
+                    t2 += 1
+                    continue
+                elif not i.isdigit() and t == "":
+                    break
+                else:
+                    t += i
+            line = line[z+1:]
+            for _ in range(t2):
+                loop_labels.append([f"LS{loops}", zline_zindex])
+                loops += 1
+                loop_labels2.append([f"LX{loops_wol}", zline_zindex])
+                loops_wol += 1
+
+        ###########################
+        # Check for SAKO keywords #
+        ###########################
+        is_inside = inside_TEKST or inside_TABLICA or jezyk_SAS
+        comment_c = (line.startswith("K)") or line.startswith(":")) and not is_inside
+
+        decimal_operation_c = line.find("=")
+        octal_operation_c = line.find("[") if line.find("[") != -1 else line.find("≡")
+        any_operation_c = decimal_operation_c + octal_operation_c != -2
+
+        tekst_c = line.startswith("TEKST") and not any_operation_c
+        calkowite_c = line.startswith("CALKOWITE:") and not any_operation_c
+        stop_c = line.startswith("STOP") and not any_operation_c
+        koniec_c = line.startswith("KONIEC") and not any_operation_c
+        jump_to = line.startswith("SKOCZDO") and not any_operation_c
+        spaces_c = line.startswith("SPACJ") and (line[5] == "A" or line[5] == "I") and not any_operation_c
+        newlines_c = line.startswith("LINI") and (line[4] == "A" or line[4] == "I") and not any_operation_c
+        strona_c = (line == "STRONA")
+        gdy_c = line.startswith("GDY") and octal_operation_c == -1
+        gdy_inaczej_c = (",INACZEJ" in line) and octal_operation_c == -1
+        drukuj_c = line.startswith("DRUKUJ(") and not any_operation_c
+        blok_c = line.startswith("BLOK(") and not any_operation_c
+        tablica_c = line.startswith("TABLICA(") and not any_operation_c
+        czytaj_c = line.startswith("CZYTAJ:") and not any_operation_c
+        loop_c = line.startswith("POWTORZ") and octal_operation_c == -1
+        skocz_wedlug_c = line.startswith("SKOCZWEDLUG") and not any_operation_c
+        drukuj_wiersz_c = line.startswith("DRUKUJWIERSZ:") and not any_operation_c
+        czytaj_wiersz_c = line.startswith("CZYTAJWIERSZ:") and not any_operation_c
+        beben_pisz_c = line.startswith("PISZNABEBENOD") and not any_operation_c
+        beben_czytaj_c = line.startswith("CZYTAJZBEBNAOD") and not any_operation_c
+        drukuj_oktalnie_c = line.startswith("DRUKUJOKTALNIE:") and not any_operation_c
+        czytaj_oktalnie_c = line.startswith("CZYTAJOKTALNIE:") and not any_operation_c
+
         ############
         # COMMENTS #
         ############
-        if comment_c and not inside_TEKST and not inside_TABLICA and not jezyk_SAS:
+        if comment_c:
             zline_zindex -= 1
             continue
         # TODO: Make more variable name friendly
@@ -431,16 +471,14 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 or line.startswith("ZWIEKSZSKALE")
                 or line.startswith("SKALA")
                 or line == "KONIECROZDZIALU")
-                and not inside_TABLICA and not inside_TEKST and decimal_operation_c == -1 and octal_operation_c == -1):
+                and not is_inside and not any_operation_c):
             zline_zindex -= 1
             continue
-        if ";" in line and not jezyk_SAS:
-            return "Semicolon", error_line_index + 1, last_label
 
         ########################
         # Optional translation #
         ########################
-        if (line.startswith("'") or line.startswith("?")) and not inside_TEKST and not inside_TABLICA:
+        if (line.startswith("'") or line.startswith("?")) and not is_inside:
             if optional_commands:
                 line = line.replace("?", "")
             else:
@@ -575,34 +613,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             zline_zindex += (len(line)*2)
             continue
 
-        ##########
-        # LABELS #
-        ##########
-        if label_c and not inside_TABLICA and not inside_TEKST and not jezyk_SAS:
-            t = re.search(match_labels, line) or re.search(r"^\**\)", line)
-            t = t.group(0).replace(")", "")
-            t2 = t.replace("*", "")
-            t2 = t2[:4]
-            if t2 != "":
-                output_file.write(f"    _{t2}: ;\n")
-                last_label = t2
-                error_line_index = -1
-            else:
-                t = "*" * t.count("*") + f"LX{loops_wol}"
-                loops_wol += 1
-                zline_zindex -= 1
-            for _ in range(t.count("*")):
-                loop_labels.append([f"LS{loops}", zline_zindex+1])
-                loops += 1
-                loop_labels2.append([t.replace("*", "")[:4], zline_zindex+1])
-            line = re.sub(match_labels, "", line)
-            if re.search(r"^\s*\**\)", line): line = re.sub(r"^\**\)", "", line)
-            zline_zindex += 1
-
         ############################
         # JEZYK SAS and JEZYK SAKO #
         ############################
-        if line == "JEZYKSAS" and not inside_TEKST and not inside_TABLICA:
+        if line == "JEZYKSAS" and not is_inside:
             jezyk_SAS = True
             output_file.write("    __asm__ volatile (\n")
             continue
@@ -610,7 +624,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             jezyk_SAS = False
             output_file.write("    );\n")
             continue
-        elif line == "JEZYKSAKO" and not jezyk_SAS and not inside_TEKST and not inside_TABLICA:
+        elif line == "JEZYKSAKO" and not is_inside:
             return 29, error_line_index, last_label
         elif jezyk_SAS:
             output_file.write(f'        {line}')
@@ -619,7 +633,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # TEKST #
         #########
-        if tekst_c != -1 and line.find("WIERSZY") != 5 and not inside_TABLICA:
+        if tekst_c and line.find("WIERSZY") != 5 and not inside_TABLICA:
             tek_wie = -1
             inside_TEKST = True
             zline_zindex -= 1
@@ -628,7 +642,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             tek_wie -= 1
             if tek_wie > 0:
                 line = line.replace("\n", "\\n")
-                output_file.write(f'    printf("{line}");\n')
+                output_file.write(f'    fputs("{line}", stdout);\n')
             else:
                 inside_TEKST = False
                 if tek_wie2 == True:
@@ -636,9 +650,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     tek_wie2 = False
                 else:
                     line = line.replace("\n", "")
-                output_file.write(f'    printf("{line}");\n')
+                output_file.write(f'    fputs("{line}", stdout);\n')
             continue
-        elif tekst_c != -1 and line.find("WIERSZY") == 5 and not inside_TABLICA:
+        elif tekst_c and line.find("WIERSZY") == 5 and not inside_TABLICA:
             tek_wie2 = True
             tek_wie = 0
             line = line[12:].replace(":", "")
@@ -656,7 +670,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # GOTOS #
         #########
-        if jump_to != -1 and not inside_TABLICA:
+        if jump_to and not inside_TABLICA:
             line = line.replace("SKOCZDO", "").replace(":", "")[:4]
             t = "//" * (line == "NAST")
             output_file.write(f"    {t}goto _{line};\n")
@@ -665,7 +679,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########################
         # GOTOS ACCORDINGLY TO X #
         ##########################
-        if skocz_wedlug != -1 and not inside_TABLICA:
+        if skocz_wedlug_c and not inside_TABLICA:
             line = line.replace("SKOCZWEDLUG", "").split(":")
             t = line[1].split(",")
             variable = line[0].replace("(", "").replace(")", "")
@@ -691,7 +705,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #########
         # LOOPS #
         #########
-        if loop_c != -1 and not inside_TABLICA:
+        if loop_c and not inside_TABLICA:
             label1 = loop_labels[len(loop_labels)-1][0]
             line = line.split(":")[1]
             variable = line.split("=")[0]
@@ -758,7 +772,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #############
         # CALKOWITE #
         #############
-        if calkowite_c != -1 and not inside_TABLICA:
+        if calkowite_c and not inside_TABLICA:
             values = line.split(":")[1].split(",")
             for z, i in enumerate(values):
                 if "*" not in i:
@@ -777,7 +791,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ########################
         # Variables Definition #
         ########################
-        if decimal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and not inside_TABLICA:
+        if decimal_operation_c != -1 and not gdy_c and not loop_c and not inside_TABLICA:
             count = 0
             for i in line:
                 if i == "(":
@@ -868,7 +882,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 output_file.write(f"    {is_float}{variable} = {operation};\n")
                 continue
 
-        if octal_operation_c != -1 and gdy_c == -1 and loop_c == -1 and not inside_TABLICA:
+        if octal_operation_c != -1 and not gdy_c and not loop_c and not inside_TABLICA:
             line = line.split("[")
             variable = line[0]
             operation = line[1]
@@ -901,7 +915,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###################
         # List Definition #
         ###################
-        if blok_c != -1 and not inside_TABLICA:
+        if blok_c and not inside_TABLICA:
             t = []
             t2 = ""
             line = line.replace("BLOK(", "").replace(")", "").split(":")
@@ -938,7 +952,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # TABLICA #
         ###########
         # TODO: Add error detection for amount of declared and given elements
-        if tablica_c != -1:
+        if tablica_c:
             line = line.replace("TABLICA(", "").replace(")", "").split(":")
             TABLICA_numbers = line[0].split(",")
             for i in range(len(TABLICA_numbers)):
@@ -1008,13 +1022,13 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # SPACES #
         ##########
-        if spaces != -1:
-            spaces = False
+        if spaces_c:
+            spaces_c = False
             line = line.replace(":", "")
             line = line[6:]
             if line != "":
-                spaces = True
-            if spaces == True:
+                spaces_c = True
+            if spaces_c == True:
                 t = process_math_operation(line)
                 output_file.write("    for (int i = 0; i < " + t +"; ++i) {\n")
                 output_file.write("        printf(\" \");\n")
@@ -1027,13 +1041,13 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ############
         # NEWLINES #
         ############
-        if newlines != -1:
-            newlines = False
+        if newlines_c:
+            newlines_c = False
             line = line.replace(":", "")
             line = line[5:]
             if line != "":
-                newlines = True
-            if newlines == True:
+                newlines_c = True
+            if newlines_c == True:
                 t = process_math_operation(line)
                 output_file.write("    for (int i = 0; i < " + str(t) +"; ++i) {\n")
                 output_file.write("        printf(\"\\n\");\n")
@@ -1046,14 +1060,14 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # STRONA #
         ##########
-        if strona_c != -1 and line == "STRONA":
+        if strona_c:
             output_file.write("    printf(\"\\f\");\n")
             continue
 
         ######################
         # PRINTING VARIABLES #
         ######################
-        if drukuj_c != -1:
+        if drukuj_c:
             if line[-1] == "-":
                 moved_List_DR = True
             line = line.replace("DRUKUJ(", "").replace("):", ":").split(":")
@@ -1108,7 +1122,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # CZYTAJ #
         ##########
-        if czytaj != -1:
+        if czytaj_c:
             line = line.replace("CZYTAJ:", "").split(",")
             if line[len(line)-1] == "-":
                 moved_List_CZ = True
@@ -1193,7 +1207,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         # CZYTAJ WIERSZ #
         #################
-        if czytaj_wiersz != -1:
+        if czytaj_wiersz_c:
             line = line.replace("CZYTAJWIERSZ:", "").split(",")
             for i in line:
                 i = i[:4]
@@ -1216,7 +1230,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         # DRUKUJ WIERSZ #
         #################
-        if drukuj_wiersz != -1:
+        if drukuj_wiersz_c:
             line = line.replace("DRUKUJWIERSZ:", "").split(",")
             for i in line:
                 i = i[:4]
@@ -1240,7 +1254,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###################
         # DRUKUJ OKTALNIE #
         ###################
-        if drukuj_oktalnie != -1:
+        if drukuj_oktalnie_c:
             line = line.replace("DRUKUJOKTALNIE:", "").split(",")
             for i in line:
                 i = i[:4]
@@ -1285,7 +1299,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###################
         # CZYTAJ OKTALNIE #
         ###################
-        if czytaj_oktalnie != -1:
+        if czytaj_oktalnie_c:
             line = line.replace("CZYTAJOKTALNIE:", "").split(",")
             for i in line:
                     zline_zindex += 0
@@ -1295,7 +1309,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #######################
         # IF AND KEYS SUPPORT #
         #######################
-        if gdy_c != -1 and gdy_inaczej_c != -1:
+        if gdy_c and gdy_inaczej_c:
             if line.startswith("GDYKLUCZ"):
                 line = line.split(",INACZEJ")
                 t, t2 = "", ""
@@ -1371,7 +1385,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         #################
         # PISZ NA BEBEN #
         #################
-        if beben_pisz_c != -1 or moved_List_PnB:
+        if beben_pisz_c or moved_List_PnB:
             if not moved_List_PnB:
                 line = line[13:].split(":", 1)
                 index = process_math_operation(line[0])
@@ -1459,7 +1473,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##################
         # CZYTAJ Z BEBNA #
         ##################
-        if beben_czytaj_c != -1 or moved_List_CZzB:
+        if beben_czytaj_c or moved_List_CZzB:
             if not moved_List_CZzB:
                 line = line[14:].split(":", 1)
                 index = process_math_operation(line[0])
@@ -1565,7 +1579,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ########
         # STOP #
         ########
-        if stop != -1:
+        if stop_c:
             if eliminate_stop:
                 line = line[4:]
                 t = "//" * (line == "NASTEPNY")
@@ -1580,7 +1594,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # KONIEC #
         ##########
-        if koniec != -1:
+        if koniec_c:
             output_file.write("}\n")
             break
 
@@ -1591,7 +1605,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     ##########
     if len(loop_labels) != 0:
         return 26, error_line_index, last_label
-    if koniec == -1:
+    if koniec_c == -1:
         return 5, error_line_index, last_label
 
     return 0, error_line_index, last_label
@@ -1608,16 +1622,28 @@ def main():
 
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
-    parser.add_argument('input_filename', help='Name of the input file')
-    parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='', help='Specify the encoding flag used to process strings.')
-    parser.add_argument('-d', '--debug', action='store_true', help='Turn off removing temporary C file after compilation.')
-    parser.add_argument('-Wall', '--all-warnings', action='store_true', help='Turn on -Wall flag while compiling using GCC.')
-    parser.add_argument('-g', action='store_true', help='Turn on -g flag while compiling using GCC.')
-    parser.add_argument('-nc', '--no-compiling', action='store_true', help='Turn off compiling C code using GCC.')
-    parser.add_argument('-es', '--eliminate-stop', action='store_true', help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
-    parser.add_argument('-ot', '--optional-translation', action='store_true', help='Turn on compiling optional commands.')
-    parser.add_argument('-dl', '--drum-location', metavar='{/path/to/file}', default='drum.txt', help='Specify the location of the drum file.')
-    parser.add_argument('-o', '--output', metavar='output_file', default='', help='Specify the name of the output file.')
+    parser.add_argument('input_filename',
+            help='Name of the input file')
+    parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='',
+            help='Specify the encoding flag used to process strings.')
+    parser.add_argument('-d', '--debug', action='store_true',
+            help='Turn off removing temporary C file after compilation.')
+    parser.add_argument('-Wall', '--all-warnings', action='store_true',
+            help='Turn on -Wall flag while compiling to binary.')
+    parser.add_argument('-g', action='store_true',
+            help='Turn on -g flag while compiling to binary.')
+    parser.add_argument('-nc', '--no-compiling', action='store_true',
+            help='Turn off compiling C code.')
+    parser.add_argument('-es', '--eliminate-stop', action='store_true',
+            help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
+    parser.add_argument('-ot', '--optional-translation', action='store_true',
+            help='Turn on compiling optional commands.')
+    parser.add_argument('-dl', '--drum-location', metavar='drum_file', default='drum.txt',
+            help='Specify the location of the drum file.')
+    parser.add_argument('-o', '--output', metavar='output_file', default='',
+            help='Specify the name of the output file.')
+    parser.add_argument('-co', '--compiler', metavar='{GCC|TCC}', default='GCC',
+            help='Specify compiler used when compiling to binary file.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -1631,6 +1657,7 @@ def main():
     opt_trans = args.optional_translation
     drum_location = args.drum_location
     output_filename = args.output
+    compiler_used = args.compiler.lower()
 
     if not os.path.isfile(input_filename):
         print(f"{input_filename}: cannot open '{input_filename}': No such file or directory")
@@ -1639,7 +1666,9 @@ def main():
     # Create the output filename
     if output_filename == "":
         output_filename = os.path.splitext(input_filename)[0]
-    tmp_b = ".tmp.c" * (not nc)
+        tmp_b = ".tmp.c" * (not nc) + ".c" * (nc)
+    else:
+        tmp_b = ".tmp.c" * (not nc)
     tmp_output_filename = output_filename + f"{tmp_b}"
 
     try:
@@ -1665,7 +1694,7 @@ def main():
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
             g_flag = "-g" * g_flag
-            compile_command = f"gcc {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename}"
+            compile_command = f"{compiler_used} {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename}"
             subprocess.run(compile_command, shell=True, check=True)
 
     except Exception as e:
