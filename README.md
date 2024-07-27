@@ -19,13 +19,13 @@ This is a very simple and basic SAKO to C compiler. I have no experience writing
 - Using `STOP 𝛼` command to restart program from a label `𝛼`
 - `JEZYK SAS` and `JEZYK SAKO` declarations
 - Numbers of type "double"
+- Unconvencional loop notation, like `1A)**)*`
 
 ## More notable NOT supported features
 - User defined subroutines
 - Changing array's size using `STRUKTURA`
 - `ROZDZIAL` declarations
 - ANY binary and octal operations
-- Unconvencional loop notation, like `1A)**)*`
 - Magnetic tape storage
 - Extensive subroutines utilisation using `PODSTAW`
 - Manipulation and utilisation of chosen devices
