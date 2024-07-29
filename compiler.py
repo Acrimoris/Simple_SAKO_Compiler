@@ -1561,7 +1561,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     i = process_math_operation(i)
                     vart = re.sub(r'\[.*?\]', '', i)
                     is_float = "float" * ((i not in integers) and (f"*{vart}" not in integers) and (i not in used_variables) and (vart not in used_variables)) + "int" * ((i in integers) or (f"*{vart}" in integers))
-                    is_float2 = "f" * (is_float == "float") + "i" * (is_float == "int")
+                    is_float2 = "f" * ((i not in integers) and (f"*{vart}" not in integers)) + "i" * ((i in integers) or (f"*{vart}" in integers))
                     spacePtr = "char* " if "spacePtr" not in used_variables else ""
                     if "spacePtr" not in used_variables: used_variables.append("spacePtr")
                     if  (i not in used_variables) and (vart not in used_variables):
