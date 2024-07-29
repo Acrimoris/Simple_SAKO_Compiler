@@ -1556,7 +1556,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     output_file.write("            }\n")
                     output_file.write("        }\n")
                     output_file.write("    }\n")
-                    zline_zindex += 32
+                    zline_zindex += 29
                 else:
                     i = process_math_operation(i)
                     vart = re.sub(r'\[.*?\]', '', i)
