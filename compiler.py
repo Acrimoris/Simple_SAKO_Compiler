@@ -79,7 +79,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     # Handle "to the power of" operations
     while "$" in math_operation:
         t = math_operation.split("$", 1)
-        operations_list="()×⋄-+/[],"
+        operations_list="()×⋄-+/[],="
         x = ""
         count = 0
         for i in reversed(t[0]):
@@ -148,14 +148,25 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
             break
         index = math_operation.find(substring)
         while index != -1:
-            if (index + len(substring) < len(math_operation)
-                    and math_operation[index + len(substring)] != '['
-                    and math_operation[index + len(substring)] in operations_list
-                    and not math_operation[index-1].isalpha()
-                    and (math_operation[index - 1] != "("
+            try:
+                condition = (math_operation[index + len(substring)] != '['
+                        and math_operation[index + len(substring)] in operations_list)
+            except:
+                condition = True
+            if index != 0:
+                condition2 = not math_operation[index-1].isalpha()
+            else:
+                condition2 = False
+            if (index + len(substring) <= len(math_operation)
+                    and condition
+                    and condition2
+                    and ((math_operation[index - 1] != "("
                         and math_operation[index - 2] != "m"
                         and math_operation[index - 3] != "l"
-                        and math_operation[index - 4] != "e")
+                        and math_operation[index - 4] != "e") or (
+                        math_operation[index - 2] != "m"
+                        and math_operation[index - 3] != "l"
+                        and math_operation[index - 4] != "e"))
                     and (math_operation[index-1] != "&"
                         and (math_operation[index-1] != ")"
                             and math_operation[index-2] != "*"
@@ -163,8 +174,8 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
                             and math_operation[index-3] != "l")
                         )
                     ):
-                math_operation = math_operation[:index] + '*' + math_operation[index:]
-            index = math_operation.find(substring, index + 2)
+                math_operation = math_operation[:index] + '(*' + math_operation[index:index+len(substring)] + ")" + math_operation[index+len(substring):]
+            index = math_operation.find(substring, index + 3)
 
     # Replace other operation signs with corresponding C ones
     math_operation = math_operation.replace('×', '*')
@@ -395,8 +406,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ##########
         # LABELS #
         ##########
-        if (line[0].isdigit() or line[0] == "*") and ")" in line and (not inside_TEKST
-                and not inside_TABLICA and not jezyk_SAS and not moved_List_SW):
+        if (line[0].isdigit() or line[0] == "*") and (not inside_TEKST and not inside_TABLICA and not jezyk_SAS
+                and not moved_List_SW and not moved_List_DR and not moved_List_PnB):
             t = ""
             t2 = 0
             for z, i in enumerate(line):
@@ -406,7 +417,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                         t = t[:4]
                         output_file.write(f"    _{t}: ;\n")
                         last_label = t
-                        error_line_index = -1
+                        error_line_index = 0
                         zline_zindex += 1
                         t = ""
                     if line[z+1].isdigit() or line[z+1] == "*":
@@ -418,8 +429,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     continue
                 elif not i.isdigit() and t == "":
                     break
-                else:
+                elif i.isdigit() or i.isalpha():
                     t += i
+                else:
+                    return 2, error_line_index, last_label
             line = line[z+1:]
             for _ in range(t2):
                 loop_labels.append([f"LS{loops}", zline_zindex])
@@ -431,6 +444,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # Check for SAKO keywords #
         ###########################
         is_inside = inside_TEKST or inside_TABLICA or jezyk_SAS
+        paren_and_colon = "(" in line and ")" in line and ":" in line
         comment_c = (line.startswith("K)") or line.startswith(":")) and not is_inside
 
         decimal_operation_c = line.find("=")
@@ -447,16 +461,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         strona_c = (line == "STRONA")
         gdy_c = line.startswith("GDY") and octal_operation_c == -1
         gdy_inaczej_c = (",INACZEJ" in line) and octal_operation_c == -1
-        drukuj_c = line.startswith("DRUKUJ(") and not any_operation_c
-        blok_c = line.startswith("BLOK(") and not any_operation_c
-        tablica_c = line.startswith("TABLICA(") and not any_operation_c
+        drukuj_c = line.startswith("DRUKUJ(") and not any_operation_c and paren_and_colon
+        blok_c = line.startswith("BLOK(") and not any_operation_c and paren_and_colon
+        tablica_c = line.startswith("TABLICA(") and not any_operation_c and paren_and_colon
         czytaj_c = line.startswith("CZYTAJ:") and not any_operation_c
-        loop_c = line.startswith("POWTORZ") and octal_operation_c == -1
-        skocz_wedlug_c = line.startswith("SKOCZWEDLUG") and not any_operation_c
+        loop_c = (line.startswith("POWTORZ") and octal_operation_c == -1 and decimal_operation_c != -1
+                and paren_and_colon)
+        skocz_wedlug_c = line.startswith("SKOCZWEDLUG") and not any_operation_c and ":" in line
         drukuj_wiersz_c = line.startswith("DRUKUJWIERSZ:") and not any_operation_c
         czytaj_wiersz_c = line.startswith("CZYTAJWIERSZ:") and not any_operation_c
-        beben_pisz_c = line.startswith("PISZNABEBENOD") and not any_operation_c
-        beben_czytaj_c = line.startswith("CZYTAJZBEBNAOD") and not any_operation_c
+        beben_pisz_c = line.startswith("PISZNABEBENOD") and not any_operation_c and ":" in line
+        beben_czytaj_c = line.startswith("CZYTAJZBEBNAOD") and not any_operation_c and ":" in line
         drukuj_oktalnie_c = line.startswith("DRUKUJOKTALNIE:") and not any_operation_c
         czytaj_oktalnie_c = line.startswith("CZYTAJOKTALNIE:") and not any_operation_c
 
@@ -466,7 +481,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         if comment_c:
             zline_zindex -= 1
             continue
-        # TODO: Make more variable name friendly
         if (    (line.startswith("USTAWSKALE")
                 or line.startswith("ZWIEKSZSKALE")
                 or line.startswith("SKALA")
@@ -641,16 +655,17 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         elif inside_TEKST:
             tek_wie -= 1
             if tek_wie > 0:
-                line = line.replace("\n", "\\n")
-                output_file.write(f'    fputs("{line}", stdout);\n')
+                line = line.replace("\n", "")
+                output_file.write(f'    puts("{line}");\n')
             else:
                 inside_TEKST = False
                 if tek_wie2 == True:
-                    line = line.replace("\n", "\\n")
+                    line = line.replace("\n", "")
                     tek_wie2 = False
+                    output_file.write(f'    puts("{line}");\n')
                 else:
                     line = line.replace("\n", "")
-                output_file.write(f'    fputs("{line}", stdout);\n')
+                    output_file.write(f'    fputs("{line}", stdout);\n')
             continue
         elif tekst_c and line.find("WIERSZY") == 5 and not inside_TABLICA:
             tek_wie2 = True
@@ -999,7 +1014,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 zline_zindex -= 1
                 continue
             except Error as e:
-                return 3, error_line_index + 1, last_label
+                return 3, error_line_index, last_label
         elif inside_TABLICA and line.replace(" ", "").replace("\n", "") == "*":
             if f"*{TABLICA_name}" in integers:
                 numbers_list = list(map(int, t.split()))
@@ -1031,11 +1046,11 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             if spaces_c == True:
                 t = process_math_operation(line)
                 output_file.write("    for (int i = 0; i < " + t +"; ++i) {\n")
-                output_file.write("        printf(\" \");\n")
+                output_file.write("        putchar(' ');\n")
                 output_file.write("    }\n")
                 zline_zindex += 2
             else:
-                output_file.write("    printf(\" \");\n")
+                output_file.write("    putchar(' ');\n")
             continue
 
         ############
@@ -1050,18 +1065,18 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             if newlines_c == True:
                 t = process_math_operation(line)
                 output_file.write("    for (int i = 0; i < " + str(t) +"; ++i) {\n")
-                output_file.write("        printf(\"\\n\");\n")
+                output_file.write("        putchar('\\n');\n")
                 output_file.write("    }\n")
                 zline_zindex += 2
             else:
-                output_file.write("    printf(\"\\n\");\n")
+                output_file.write("    putchar('\\n');\n")
             continue
 
         ##########
         # STRONA #
         ##########
         if strona_c:
-            output_file.write("    printf(\"\\f\");\n")
+            output_file.write("    putchar('\\f');\n")
             continue
 
         ######################
@@ -1508,7 +1523,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 vart = re.sub(r'\[.*?\]', '', i)
                 if "*" in i:
                     i = i.replace("*", "")
-                    i = process_math_operation(i)
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
                     is_float = is_float2[0]
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
@@ -1598,7 +1612,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             output_file.write("}\n")
             break
 
-        return 2, error_line_index + 1, last_label
+        return 2, error_line_index, last_label
 
     ##########
     # ERRORS #
