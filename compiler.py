@@ -16,8 +16,11 @@ def is_number(s):
         return "int"
 
 def process_math_operation(math_operation: str, user_functions=[]) -> str:
+    # TODO: Fix following functions: MAX, MIN
+    # Also finally finish CCC
+    # And make ELM work with float arrays
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "fmod", "sgn", "sako_abs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "sako_mod", "sgn", "sako_abs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
     double_functions = ["DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     read_double = "CZD"
     print_double = "DRD"
@@ -39,13 +42,14 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     # Replace "*" with "$" for further processing
     math_operation = math_operation.replace('*', '$')
+    math_operation = math_operation.replace('⋄', '×')
 
     # Handle numbers of type double
     # Probably will need reworking
     # Expecially this huge function
     #
     # Handle doubles being assigned a value
-    operations_list = "+-/×⋄$"
+    operations_list = "+-/×$,"
     if (math_operation[:2] == "($"
             and math_operation[-1:] == ")"
             and not any(char in operations_list for char in math_operation[2:][:-1])
@@ -54,18 +58,19 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
         math_operation = math_operation[2:][:-1]
         math_operation = f"*((double*){math_operation})"
     # Handle doubles in functions
-    elif any(sub in math_operation for sub in double_functions):
+    elif any(sub+"(" in math_operation for sub in double_functions):
         math_operation = handle_doubles(math_operation, double_functions)
     # Reading doubles
+    # TODO: Make reading work in middle of operation
     elif math_operation.startswith(f"{read_double}("):
         math_operation = math_operation.replace("$", "(double*)&")
-    elif math_operation.startswith(read_double):
+    elif math_operation == "read_double":
         print("No support yet for assignments like (*A) = CZD")
     # Printing doubles
     # TODO: Add support for S argument and better K support
     elif math_operation.startswith(f"{print_double}("):
         t = math_operation.split(",")[0].replace("DRD(", "")
-        math_operation = math_operation.replace(t, f"*((double *){t[1:]})")
+        math_operation = math_operation.replace(t, f"*((double*){t[1:]})")
         if math_operation.count(",") >= 3:
             math_operation = math_operation.split(",")
             math_operation.insert(3, "1")
@@ -77,9 +82,88 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
             math_operation = ",".join(math_operation)
 
     # Handle "to the power of" operations
-    while "$" in math_operation:
-        t = math_operation.split("$", 1)
-        operations_list="()×⋄-+/[],="
+    operations_list="()×-+/[],="
+    math_operation = operation_to_function(math_operation, "$", "pow", "()×-+/[],=")
+    #math_operation = operation_to_function(math_operation, "×", "mul", "()-+[],=")
+
+    # Replace SAKO functions with C functions
+    if any(sub in math_operation for sub in SAKO_functions):
+        pairs = zip(SAKO_functions, C_functions)
+        sorted_pairs = sorted(pairs, key=lambda x: len(x[0]), reverse=True)
+        math_operation = reduce(lambda s, pair: s.replace(f"{pair[0]}(", f"{pair[1]}("), sorted_pairs, math_operation)
+
+    # Replace `array_name` with `*array_name` when no index is given
+    operations_list="×⋄-+/,])"
+    for substring in array_names:
+        if math_operation == substring:
+            math_operation = f"*{math_operation}"
+            break
+        index = math_operation.find(substring)
+        while index != -1:
+            try:
+                condition = (math_operation[index + len(substring)] != '['
+                        and math_operation[index + len(substring)] in operations_list)
+            except:
+                condition = True
+            if index != 0:
+                condition2 = not math_operation[index-1].isalpha()
+            else:
+                condition2 = True
+            if (index + len(substring) <= len(math_operation)
+                    and condition
+                    and condition2
+                    and math_operation[index-4:index] != "elm("
+                    and math_operation[index-9:index] != "(double*)"
+                    and math_operation[index-10:index] != "(double*)&"
+                    ):
+                math_operation = (math_operation[:index] + '(*' + math_operation[index:index+len(substring)]
+                                   + ")" + math_operation[index+len(substring):])
+            index = math_operation.find(substring, index + 3)
+
+    # Replace other SAKO operations with corresponding C ones
+    math_operation = math_operation.replace('×', '*')
+
+    return math_operation
+
+def handle_square_brackets(math_operation: str) -> str:
+    operations_list = "+-/×⋄*,"
+    new_operation = ""
+    part = ""
+    count_p = 0
+    count_sb = 0
+    is_array= False
+    for i in math_operation:
+        if i in operations_list and count_p + count_sb == 0:
+            part += i
+            new_operation += part
+            part = ""
+        elif i == "(":
+            is_array = (part in array_names or part.split("[")[-1] in array_names
+                    or any((part.split(char)[-1] in array_names) for char in operations_list))
+            if is_array and part != "":
+                part += "["
+                count_sb += 1
+            else:
+                part += i
+                count_p += 1
+        elif i == ")":
+            if part.count("[") - part.count("]") > 0 and count_p == 0:
+                part += "]"
+                count_sb -= 1
+            else:
+                part += i
+                count_p -= 1
+        elif i == "," and count_p == 0:
+            part += "]["
+        else:
+            part += i
+    if part != "":
+        new_operation += part
+    return new_operation
+
+def operation_to_function(math_operation, op_symbol, function, operations_list):
+    while op_symbol in math_operation:
+        t = math_operation.split(op_symbol, 1)
         x = ""
         count = 0
         for i in reversed(t[0]):
@@ -132,91 +216,9 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
         if x[0] == "(" and y[-1] == ")":
             x = x[1:]
             y = y[:-1]
-        math_operation = math_operation.replace(f"{x}${y}", f"pow({x}, {y})")
-
-    # Replace SAKO functions with C functions
-    if any(sub in math_operation for sub in SAKO_functions):
-        pairs = zip(SAKO_functions, C_functions)
-        sorted_pairs = sorted(pairs, key=lambda x: len(x[0]), reverse=True)
-        math_operation = reduce(lambda s, pair: s.replace(f"{pair[0]}(", f"{pair[1]}("), sorted_pairs, math_operation)
-
-    # Replace `array_name` with `*array_name` when no index is given
-    operations_list="×⋄-+/,])"
-    for substring in array_names:
-        if math_operation == substring:
-            math_operation = f"*{math_operation}"
-            break
-        index = math_operation.find(substring)
-        while index != -1:
-            try:
-                condition = (math_operation[index + len(substring)] != '['
-                        and math_operation[index + len(substring)] in operations_list)
-            except:
-                condition = True
-            if index != 0:
-                condition2 = not math_operation[index-1].isalpha()
-            else:
-                condition2 = False
-            if (index + len(substring) <= len(math_operation)
-                    and condition
-                    and condition2
-                    and ((math_operation[index - 1] != "("
-                        and math_operation[index - 2] != "m"
-                        and math_operation[index - 3] != "l"
-                        and math_operation[index - 4] != "e") or (
-                        math_operation[index - 2] != "m"
-                        and math_operation[index - 3] != "l"
-                        and math_operation[index - 4] != "e"))
-                    and (math_operation[index-1] != "&"
-                        and (math_operation[index-1] != ")"
-                            and math_operation[index-2] != "*"
-                            and math_operation[index-3] != "e"
-                            and math_operation[index-3] != "l")
-                        )
-                    ):
-                math_operation = math_operation[:index] + '(*' + math_operation[index:index+len(substring)] + ")" + math_operation[index+len(substring):]
-            index = math_operation.find(substring, index + 3)
-
-    # Replace other operation signs with corresponding C ones
-    math_operation = math_operation.replace('×', '*')
-    math_operation = math_operation.replace('⋄', '*')
-
+        math_operation = math_operation.replace(f"{x}{op_symbol}{y}", f"{function}({x}, {y})")
     return math_operation
 
-def handle_square_brackets(math_operation: str) -> str:
-    operations_list = "+-/×⋄*,"
-    new_operation = ""
-    part = ""
-    count_p = 0
-    count_sb = 0
-    is_array= False
-    for i in math_operation:
-        if i in operations_list and count_p + count_sb == 0:
-            part += i
-            new_operation += part
-            part = ""
-        elif i == "(":
-            is_array = part in array_names or part.split("[")[-1] in array_names or any((part.split(char)[-1] in array_names) for char in operations_list)
-            if is_array and part != "":
-                part += "["
-                count_sb += 1
-            else:
-                part += i
-                count_p += 1
-        elif i == ")":
-            if part.count("[") - part.count("]") > 0 and count_p == 0:
-                part += "]"
-                count_sb -= 1
-            else:
-                part += i
-                count_p -= 1
-        elif i == "," and count_p == 0:
-            part += "]["
-        else:
-            part += i
-    if part != "":
-        new_operation += part
-    return new_operation
 
 def handle_doubles(math_operation, double_functions):
     def find_matching_paren(s, start):
@@ -311,6 +313,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
     output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
     output_file.write("#define sako_abs(X) _Generic((X), int: abs, float: fabsf)(X)\n")
+    output_file.write("#define sako_mod(X, Y) _Generic((X) + (Y), int: (int)fmodf((float)(X), (float)(Y)), float: fmodf((float)(X), (float)(Y)))\n")
 
     # Add macros and functions for double numbers
     output_file.write("#define GET_MACRO(_1,_2,_3,NAME,...) NAME\n")
@@ -327,8 +330,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("void DZD3(double num, double num2, double* num3) { *num3 = num / num2; }\n")
     output_file.write("#define DZD(...) GET_MACRO(__VA_ARGS__, DZD3, DZD2)(__VA_ARGS__)\n")
     output_file.write("double ABD(double num){ return fabs(num); }\n")
-    output_file.write("double IDK(float num){ return (double)num; }\n")
-    output_file.write("float IKD(double num){ return (float)num; }\n\n")
+    output_file.write("double IKD(float num){ return (double)num; }\n")
+    output_file.write("float IDK(double num){ return (float)num; }\n\n")
 
     # Specify encoding, used in DRUKUJ/CZYTAJ WIERSZ
     if encoding == "ASCII":
@@ -339,11 +342,14 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         output_file.write("int encoding[128] = {61, -1, -1, -1, -1, -1, -1, -1, -1, -1, 58, -1, 60, 62, 20, 47, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 19, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, 12, 3, 6, 5, 4, 10, 8, 2, 9, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 11, 7, 16, 13, 17, 18, -1, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 14, -1, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 59, 63};\n\n")
 
     # Two big functions for reading and printing doubles
-    output_file.write("void DRD(double num, int I, int J, int is_K, ...){ va_list args; va_start(args, is_K); int K = 0; float S = 0.0; K = va_arg(args, int); S = (float)va_arg(args, double); va_end(args); int minusI = S-S; int minusJ = 0; const char* formatTemplate; int printedLength = 0; if (I < 0) { minusI = 1; I = fabs(I); } if (J < 0) { minusJ = 1; J = fabs(J); } if (K < 0 && is_K == 1) { minusI = 1; K = fabs(K); } int totalWidth = I + J + 2; char format[30]; if (num >= 0 && minusI == 0 && minusJ != 1) { formatTemplate = \"%%+%d.%df\"; } else if (num >= 0 && minusI == 1) { formatTemplate = \" %%%d.%df\"; totalWidth -= 1; printedLength -= 1; } else { formatTemplate = \"%%%d.%df\"; } if (minusJ == 1) { snprintf(format, sizeof(format), \"%%%s%d.%df\", num < 0 ? \"-\" : \"0\", totalWidth, J); } else { snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } printedLength += snprintf(NULL, 0, format, num); if (printedLength > totalWidth) { snprintf(format, sizeof(format), \"%%%d.%dE\", totalWidth, J); } printf(format, num); }\n")
+    output_file.write("void DRD(double num, int I, int J, int8_t is_K, ...){ va_list args; va_start(args, is_K); int K = 0; float S = 0.0; K = va_arg(args, int); S = (float)va_arg(args, double); va_end(args); int minusI = S-S; int minusJ = 0; const char* formatTemplate; int printedLength = 0; if (I < 0) { minusI = 1; I = fabs(I); } if (J < 0) { minusJ = 1; J = fabs(J); } if (K < 0 && is_K == 1) { minusI = 1; K = fabs(K); } int totalWidth = I + J + 2; char format[30]; if (num >= 0 && minusI == 0 && minusJ != 1) { formatTemplate = \"%%+%d.%df\"; } else if (num >= 0 && minusI == 1) { formatTemplate = \" %%%d.%df\"; totalWidth -= 1; printedLength -= 1; } else { formatTemplate = \"%%%d.%df\"; } if (minusJ == 1) { snprintf(format, sizeof(format), \"%%%s%d.%df\", num < 0 ? \"-\" : \"0\", totalWidth, J); } else { snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } printedLength += snprintf(NULL, 0, format, num); if (printedLength > totalWidth) { snprintf(format, sizeof(format), \"%%%d.%dE\", totalWidth, J); } printf(format, num); }\n")
     output_file.write("int CZD(double* num) { char input[500]; char convert[500]; double tmp = 0.0; int erno = -1; int i = 0; fgets(input, sizeof(input), stdin); char* ptr = input; while (*ptr != '\\0' && *ptr != '\\n') { if (isdigit(*ptr) || *ptr == '.' || *ptr == '+' || *ptr == '-' || *ptr == 'E') { convert[i] = *ptr; i++; erno = *ptr; ptr++; } else { input[0] = -1; break; } } erno = encoding[erno]; if (input[0] == -1) { erno = -erno; } errno = 0; tmp = strtod(convert, &ptr); if (errno == ERANGE && tmp <= DBL_MIN) { erno = -(erno+64); } else if (errno == ERANGE && tmp == HUGE_VAL) { erno = -(erno+128); } *num = tmp; return erno; }\n\n")
 
     # DRUKUJ C function
-    output_file.write("void drukuj(int I, int J, int is_K, int type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 1; char format[30]; if (type == 0){ if (numi >= 0) { formatTemplate = \" %%%dd\"; } else { formatTemplate = \"%%%dd\"; } totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 5; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } totalWidth += 1; snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1 && is_K == 0) { if (numf >= 0) { formatTemplate = \"%%+%d.%dE \"; } else { formatTemplate = \"%%%d.%dE \"; } snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); }}\n\n")
+    output_file.write("void drukuj(int I, int J, int8_t is_K, int type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 1; char format[30]; if (type == 0){ if (numi >= 0) { formatTemplate = \" %%%dd\"; } else { formatTemplate = \"%%%dd\"; } totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 5; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } totalWidth += 1; snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1 && is_K == 0) { if (numf >= 0) { formatTemplate = \"%%+%d.%dE \"; } else { formatTemplate = \"%%%d.%dE \"; } snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); }}\n\n")
+
+    # NADMIAR functions and variable
+    output_file.write("int8_t nadmiar = 0;\n")
 
     # Global variables
     output_file.write(f"int keys[] = {keys}; int opt;\n")
@@ -371,7 +377,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_SW = False
     moved_List_SW_index = -1
 
-    zline_zindex = 45
+    zline_zindex = 47
     error_line_index = 0
     for line in input_file:
         # Debug lines
@@ -424,13 +430,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                         continue
                     else:
                         break
-                elif i == "*":
-                    t2 += 1
-                    continue
-                elif not i.isdigit() and t == "":
-                    break
                 elif i.isdigit() or i.isalpha():
                     t += i
+                elif i == "*":
+                    t2 += 1
+                elif not i.isdigit() and t == "":
+                    break
                 else:
                     return 2, error_line_index, last_label
             line = line[z+1:]
@@ -721,7 +726,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # LOOPS #
         #########
         if loop_c and not inside_TABLICA:
-            label1 = loop_labels[len(loop_labels)-1][0]
+            try:
+                label1 = loop_labels[len(loop_labels)-1][0]
+            except:
+                return 10, error_line_index, last_label
             line = line.split(":")[1]
             variable = line.split("=")[0]
             line = line.split("=")[1]
@@ -807,16 +815,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # Variables Definition #
         ########################
         if decimal_operation_c != -1 and not gdy_c and not loop_c and not inside_TABLICA:
-            count = 0
-            for i in line:
-                if i == "(":
-                    count += 1
-                elif i == ")":
-                    count -= 1
-                if i == "=" and count != 0:
-                    count = True
-                    break
-            if count == True:
+            count = line.count("=")
+            if count != 1:
                 line = process_math_operation(line)
                 z = line.split("=")
                 z = z[len(z)-1]
@@ -874,12 +874,12 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     count -= 1
                     zline_zindex += 1
                 continue
-            if len(line) >= 3 and count != True and line.split("=")[0]=="()":
+            if len(line) >= 3 and count == 1 and line.split("=")[0]=="()":
                 line = line.split("=")
                 operation = process_math_operation(line[1])
                 output_file.write(f"    {operation};\n")
                 continue
-            elif len(line) >= 3 and count != True:
+            elif len(line) >= 3 and count == 1:
                 is_float = ""
                 whole = line.split("=")
                 variable = whole[0]
@@ -918,10 +918,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 t2 = f"0{t2}"
                 operation = operation.replace(t, t2)
 
-            vart = re.sub(r'\[.*?\]', '', variable)[:4]
-            if variable[0] != "*":
-                is_float = "float " * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int " * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
-                if variable not in used_variables and vart not in used_variables: used_variables.append(vart)
+            variable = variable[:4]
+            is_float = ("float " * (variable not in integers) + "int " * (variable in integers)) * (variable not in used_variables)
+            if variable not in used_variables: used_variables.append(variable)
             output_file.write(f"    {is_float}{variable} = {operation};\n")
             continue
 
@@ -966,7 +965,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###########
         # TABLICA #
         ###########
-        # TODO: Add error detection for amount of declared and given elements
         if tablica_c:
             line = line.replace("TABLICA(", "").replace(")", "").split(":")
             TABLICA_numbers = line[0].split(",")
@@ -1022,6 +1020,11 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             else:
                 numbers_list = list(map(float, t.split()))
                 is_float = "float"
+            tablica_elem = 1
+            for i in TABLICA_numbers:
+                tablica_elem *= i
+            if tablica_elem != len(numbers_list):
+                return 28, error_line_index, last_label
             # Determine the shape of the multidimensional array based on the given numbers
             shape = list(map(int, TABLICA_numbers[::-1]))
             # Create the multidimensional array using list comprehension
@@ -1085,6 +1088,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         if drukuj_c:
             if line[-1] == "-":
                 moved_List_DR = True
+                line = line[:-2]
             line = line.replace("DRUKUJ(", "").replace("):", ":").split(":")
             t = line[1]
             line = line[0].replace(",", ".")
@@ -1121,9 +1125,6 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 line = process_math_operation(line)
                 line = f"{line}, 0"
                 is_float = "0"
-            if t3[-1] == "-":
-                moved_List_DR = True
-                t3.pop()
             line = f"{line}, {t}, {is_float}{t2}"
             if moved_List_DR:
                 line_DR = line
@@ -1253,7 +1254,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     moved_List_DRW = True
                     break
                 if f"*{i}" not in integers:
-                    break
+                    return 30, error_line_index, last_label
                 output_file.write("    for (int i = 0; i < elm("+i+"); ++i) {\n")
                 output_file.write("         for (int j = 0; j < 128; ++j) {\n")
                 output_file.write("             if (encoding[j] == "+i+"[i]) {\n")
@@ -1269,45 +1270,42 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         ###################
         # DRUKUJ OKTALNIE #
         ###################
-        if drukuj_oktalnie_c:
-            line = line.replace("DRUKUJOKTALNIE:", "").split(",")
+        if drukuj_oktalnie_c or moved_List_DRO:
+            # TODO: Make it work with non-variables
+            # Add actual type checking system via checking operators
+            # and functions to decide if it should be integer or float
+            if line[-1] == "-":
+                moved_List_DRO = True
+                line = line[:-2]
+            else:
+                moved_List_DRO = False
+            line = line.replace("DRUKUJOKTALNIE:", "")
+            t2 = ""
+            t3 = []
+            count = 0
             for i in line:
-                i = i[:4]
-                if i == "-":
-                    moved_List_DRO = True
+                if count < 0:
                     break
-                variable = i
+                if str(i) == "(":
+                    count += 1
+                elif str(i) == ")":
+                    count -= 1
+                t2 += str(i)
+                if i == "," and count == 0:
+                    t3.append(t2[:-1])
+                    t2 = ""
+            if t2 != "":
+                t3.append(t2)
+            for i in t3:
+                variable = process_math_operation(i)
                 vart = re.sub(r'\[.*?\]', '', variable)[:4]
-                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers) and (variable not in used_variables) and (vart not in used_variables)) + "int" * ((variable not in used_variables) and (vart not in used_variables)) * ((variable in integers) or (f"*{vart}" in integers))
-                if "octal_index" not in used_variables:
-                    is_float2 = "int "
-                else:
-                    is_float2 = ""
-                    used_variables.append("octal_index")
-                if "octal_parts" not in used_variables:
-                    is_float3 = "char "
-                else:
-                    is_float3 = ""
-                    used_variables.append("octal_parts")
-                if is_float == "int":
-                    output_file.write(f"    {is_float3}octal_parts[4][4];\n")
-                    output_file.write(f"    {is_float2}octal_index = 0;\n")
-                    output_file.write(f"    while ({i} > 0 || octal_index < 4) {{\n")
-                    output_file.write(f"        int part = {i} % 0100;\n")
-                    output_file.write(f"        {i} /= 0100;\n")
-                    output_file.write("        snprintf(octal_parts[octal_index], sizeof(octal_parts[octal_index]), \"%02o\", part);\n")
-                    output_file.write("        octal_index++;\n")
-                    output_file.write("    }\n")
-                    output_file.write("    for (int i = 3; i >= 0; i--) {\n")
-                    output_file.write("        printf(\"%s\", octal_parts[i]);\n")
-                    output_file.write("        if (i > 0) {\n")
-                    output_file.write("            printf(\".\");\n")
-                    output_file.write("        }\n")
-                    output_file.write("    }\n")
-                    zline_zindex += 14
-                else:
-                    output_file.write("")
-                    zline_zindex += 0
+                is_float = "float" * ((variable not in integers) and (f"*{vart}" not in integers)) + "int" * ((variable in integers) or (f"*{vart}" in integers))
+                # if is_float == "int":
+                #     output_file.write(f"    drukuj_oktalnie_int({vart});\n")
+                #     zline_zindex += 1
+                # else:
+                #     output_file.write(f"    drukuj_oktalnie_float({vart});\n")
+                #     zline_zindex += 1
             zline_zindex -= 1
             continue
 
@@ -1354,12 +1352,19 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 label2 = line[1]
                 label2 = label2[:4]
                 line = line[0]
-                line.replace("GDYBYLNADMIAR:", "")
+                line = line.replace("GDYBYLNADMIAR:", "")
                 label1 = line[:4]
-                t = "//" * (label2 == "NAST")
+                t = "//" * (label1 == "NAST")
+                t2 = "//" * (label2 == "NAST")
                 # TODO: Add NADMIAR detection
                 # There is no detection for that right now, so it's just goto
-                output_file.write(f"    {t}goto _{label2};\n")
+                output_file.write("    if (nadmiar == 1) {\n")
+                output_file.write(f"        {t}goto _{label1};\n")
+                output_file.write("        nadmiar = 0;\n")
+                output_file.write("    } else {\n")
+                output_file.write(f"        {t2}goto _{label2};\n")
+                output_file.write("    }\n")
+                zline_zindex += 5
                 continue
 
             t = t2 = mode = ""
@@ -1658,6 +1663,8 @@ def main():
             help='Specify the name of the output file.')
     parser.add_argument('-co', '--compiler', metavar='{GCC|TCC}', default='GCC',
             help='Specify compiler used when compiling to binary file.')
+    parser.add_argument('-f', '--flags', metavar='"flags"', default='',
+            help='Specify compiler flags used when compiling to binary file.')
 
     # Parse the command-line arguments
     args = parser.parse_args()
@@ -1672,6 +1679,7 @@ def main():
     drum_location = args.drum_location
     output_filename = args.output
     compiler_used = args.compiler.lower()
+    flags = args.flags
 
     if not os.path.isfile(input_filename):
         print(f"{input_filename}: cannot open '{input_filename}': No such file or directory")
@@ -1708,7 +1716,7 @@ def main():
             # Compile the generated C code into an executable
             wall = "-Wall" * wall_b
             g_flag = "-g" * g_flag
-            compile_command = f"{compiler_used} {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename}"
+            compile_command = f"{compiler_used} {tmp_output_filename} -lm -fsingle-precision-constant {g_flag} {wall} -o {output_filename} {flags}"
             subprocess.run(compile_command, shell=True, check=True)
 
     except Exception as e:
