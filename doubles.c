@@ -62,7 +62,7 @@ int CZD(double* num) {
 // To finish S, I must first finish octal numbers
 // K is almost fully done in drukuj() function
 // When I finish it there, I will add it here
-void DRD(double num, int I, int J, int is_K, ...){
+void DRD(double num, int I, int J, int8_t is_K, ...){
     va_list args;
     va_start(args, is_K);
     int K = 0;
@@ -136,8 +136,8 @@ double ABD(double num){ return fabs(num); }
 
 /* CONVERSION */
 
-double IDK(float num){ return (double)num; }
-float IKD(double num){ return (float)num; }
+double IKD(float num){ return (double)num; }
+float IDK(double num){ return (float)num; }
 
 /* TESTS */
 
@@ -172,7 +172,8 @@ int main() {
     printf("\n");
     DOD(MND(*((double*)n), *((double*)n)), ODD(*((double*)n), DZD(*((double*)n), *((double*)n2))), (double*)&n2);
 
-    //DRD(*((double *)n2));
+    printf("\n");
+    DRD(IKD(-1.0), 2, 3, 0);
     printf("\n");
     
     return 0;
