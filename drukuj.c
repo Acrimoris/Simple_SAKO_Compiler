@@ -8,8 +8,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
+#include <stdint.h>
 
-void drukuj(int I, int J, int is_K, int type, ...){
+void drukuj(int I, int J, int8_t is_K, int8_t type, ...){
     I = fabs(I);
     if (I > 50) { I = 50; }
     va_list args;
