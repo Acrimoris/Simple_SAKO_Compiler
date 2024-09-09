@@ -93,7 +93,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
         math_operation = reduce(lambda s, pair: s.replace(f"{pair[0]}(", f"{pair[1]}("), sorted_pairs, math_operation)
 
     # Replace `array_name` with `*array_name` when no index is given
-    operations_list="×⋄-+/,])"
+    operations_list="×-+/,])"
     for substring in array_names:
         if math_operation == substring:
             math_operation = f"*{math_operation}"
@@ -125,14 +125,18 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     return math_operation
 
+# TODO: Fix for situations like: "ARRAY((ARRAY(I+3)+3)*2)"
 def handle_square_brackets(math_operation: str) -> str:
     operations_list = "+-/×⋄*,"
     new_operation = ""
     part = ""
+    parts = []
     count_p = 0
+    counts_p = []
     count_sb = 0
-    is_array= False
+    is_array = False
     for i in math_operation:
+        # print(part, i)
         if i in operations_list and count_p + count_sb == 0:
             part += i
             new_operation += part
@@ -143,22 +147,30 @@ def handle_square_brackets(math_operation: str) -> str:
             if is_array and part != "":
                 part += "["
                 count_sb += 1
+                counts_p.append(count_p)
+                count_p = 0
+            elif count_sb == 0:
+                part += i
+                count_p += 1
+                new_operation += part
+                part = ""
             else:
                 part += i
                 count_p += 1
         elif i == ")":
-            if part.count("[") - part.count("]") > 0 and count_p == 0:
+            if count_sb > 0 and count_p == 0:
                 part += "]"
                 count_sb -= 1
+                count_p = counts_p[-1]
+                counts_p.pop()
             else:
                 part += i
                 count_p -= 1
-        elif i == "," and count_p == 0:
+        elif i == "," and count_p == 0 and count_sb > 0:
             part += "]["
         else:
             part += i
-    if part != "":
-        new_operation += part
+    new_operation += part
     return new_operation
 
 def operation_to_function(math_operation, op_symbol, function, operations_list):
@@ -305,7 +317,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     restricted_eval = {"__builtins__": None}
 
     # Add necessary C lines
-    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n#include <errno.h>\n#include <float.h>\n#include <stdarg.h>\n\n")
+    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n#include <errno.h>\n#include <float.h>\n#include <stdarg.h>\n#include <stdint.h>\n\n")
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }), float: ({ float sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }), float: ({ float iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }))\n")
     output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : 1))\n")
@@ -346,7 +358,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("int CZD(double* num) { char input[500]; char convert[500]; double tmp = 0.0; int erno = -1; int i = 0; fgets(input, sizeof(input), stdin); char* ptr = input; while (*ptr != '\\0' && *ptr != '\\n') { if (isdigit(*ptr) || *ptr == '.' || *ptr == '+' || *ptr == '-' || *ptr == 'E') { convert[i] = *ptr; i++; erno = *ptr; ptr++; } else { input[0] = -1; break; } } erno = encoding[erno]; if (input[0] == -1) { erno = -erno; } errno = 0; tmp = strtod(convert, &ptr); if (errno == ERANGE && tmp <= DBL_MIN) { erno = -(erno+64); } else if (errno == ERANGE && tmp == HUGE_VAL) { erno = -(erno+128); } *num = tmp; return erno; }\n\n")
 
     # DRUKUJ C function
-    output_file.write("void drukuj(int I, int J, int8_t is_K, int type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 1; char format[30]; if (type == 0){ if (numi >= 0) { formatTemplate = \" %%%dd\"; } else { formatTemplate = \"%%%dd\"; } totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 5; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } totalWidth += 1; snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1 && is_K == 0) { if (numf >= 0) { formatTemplate = \"%%+%d.%dE \"; } else { formatTemplate = \"%%%d.%dE \"; } snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); }}\n\n")
+    output_file.write("void drukuj(int I, int J, int8_t is_K, int8_t type, ...){ I = fabs(I); if (I > 50) { I = 50; } va_list args; va_start(args, type); int K = 0; int numi = 0; float numf = 0; K = va_arg(args, int); numi = va_arg(args, int); numf = (float)va_arg(args, double); va_end(args); if (is_K == 0) { numi = K; } const char* formatTemplate; int printedLength = 0; int totalWidth = I + J + 1; char format[30]; if (type == 0){ if (numi >= 0) { formatTemplate = \" %%%dd\"; } else { formatTemplate = \"%%%dd\"; } totalWidth -= 1; snprintf(format, sizeof(format), formatTemplate, totalWidth); } else if (is_K == 1) { int exponent = 0; totalWidth += 5; if (numf != 0) { exponent = (int)floor(log10(fabs(numf))); numf /= pow(10, exponent); } if (numf >= 0) { formatTemplate = \"+%%.%dfE%+d \"; } else { formatTemplate = \"%%.%dfE%+d \"; } double scaling_factor = pow(10, K - 2); numf *= scaling_factor; snprintf(format, sizeof(format), formatTemplate, J, exponent - K + 2); } else { if (numf >= 0) { formatTemplate = \"%%+%d.%df\"; } else { formatTemplate = \"%%%d.%df\"; } totalWidth += 1; snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printedLength += snprintf(NULL, 0, format, numi); } else { printedLength += snprintf(NULL, 0, format, numf); } if (printedLength > totalWidth && type == 1 && is_K == 0) { if (numf >= 0) { formatTemplate = \"%%+%d.%dE \"; } else { formatTemplate = \"%%%d.%dE \"; } snprintf(format, sizeof(format), formatTemplate, totalWidth, J); } if (type == 0) { printf(format, numi); } else { printf(format, numf); }}\n\n")
 
     # NADMIAR functions and variable
     output_file.write("int8_t nadmiar = 0;\n")
@@ -377,7 +389,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_SW = False
     moved_List_SW_index = -1
 
-    zline_zindex = 47
+    zline_zindex = 48
     error_line_index = 0
     for line in input_file:
         # Debug lines
@@ -1232,14 +1244,15 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 if i == "-":
                     moved_List_CZW = True
                     break
-                output_file.write(f"    fgets(input, sizeof(input), stdin);\n")
-                output_file.write("    for (int i = 0; i < strlen(input); ++i) {\n")
+                output_file.write(f"    for (int i = 0; i < elm({i}); ++i) {{\n")
+                output_file.write("       input[0] = getchar();\n")
                 if encoding != "ASCII":
-                    output_file.write(f"       {i}[i] = encoding[(int)input[i]];\n")
+                    output_file.write(f"       {i}[i] = encoding[(int)input[0]];\n")
                 else:
-                    output_file.write(f"        {i}[i] = input[i];\n")
+                    zline_zindex -= 1
+                output_file.write("       if (input[0] == '\\n') { break; }\n")
                 output_file.write("    }\n")
-                zline_zindex += 4
+                zline_zindex += 5
             zline_zindex -= 1
             continue
 
@@ -1525,9 +1538,10 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
 
             t = line[0].replace("*", "")
             for z, i in enumerate(line):
-                vart = re.sub(r'\[.*?\]', '', i)
                 if "*" in i:
                     i = i.replace("*", "")
+                    i = i[:4]
+                    vart = re.sub(r'\[.*?\]', '', i)
                     is_float2 = "float" * ((i not in integers) and (f"*{vart}" not in integers)) + "int" * ((i in integers) or (f"*{vart}" in integers))
                     is_float = is_float2[0]
                     ptr = f"{is_float2}* ptr{is_float}" if f"ptr{is_float}" not in used_variables else f"ptr{is_float}"
