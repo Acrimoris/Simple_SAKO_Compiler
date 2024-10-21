@@ -20,7 +20,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     # Also finally finish CCC
     # And make ELM work with float arrays
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "sako_mod", "sgn", "sako_abs", "(int)floor", "div", "sum", "iln", "elm", "*&", "read_int"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "sako_mod", "sgn", "sako_abs", "ent", "div", "sum", "iln", "elm", "*&", "read_int"]
     double_functions = ["DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     read_double = "CZD"
     print_double = "DRD"
@@ -83,8 +83,11 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     # Handle "to the power of" operations
     operations_list="()×-+/[],="
-    math_operation = operation_to_function(math_operation, "$", "pow", "()×-+/[],=")
-    #math_operation = operation_to_function(math_operation, "×", "mul", "()-+[],=")
+    math_operation = operation_to_function(math_operation, "$", "pow", "()×-+/[],=", "")
+    #math_operation = operation_to_function(math_operation, "×", "multiply", "()-+[],=", "/")
+    #math_operation = operation_to_function(math_operation, "/", "divide", "()-+[],=", "")
+    #math_operation = operation_to_function(math_operation, "+", "add", "()[],=", "-")
+    #math_operation = operation_to_function(math_operation, "-", "subtract", "()[],=", "")
 
     # Replace SAKO functions with C functions
     if any(sub in math_operation for sub in SAKO_functions):
@@ -122,90 +125,84 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     # Replace other SAKO operations with corresponding C ones
     math_operation = math_operation.replace('×', '*')
+    # Prettier
+    math_operation = math_operation.replace(",", ", ")
 
     return math_operation
 
-# TODO: Fix for situations like: "ARRAY((ARRAY(I+3)+3)*2)"
 def handle_square_brackets(math_operation: str) -> str:
     operations_list = "+-/×⋄*,"
-    new_operation = ""
-    part = ""
-    parts = []
-    count_p = 0
-    counts_p = []
-    count_sb = 0
-    is_array = False
-    for i in math_operation:
-        # print(part, i)
-        if i in operations_list and count_p + count_sb == 0:
-            part += i
-            new_operation += part
-            part = ""
-        elif i == "(":
-            is_array = (part in array_names or part.split("[")[-1] in array_names
-                    or any((part.split(char)[-1] in array_names) for char in operations_list))
-            if is_array and part != "":
-                part += "["
-                count_sb += 1
-                counts_p.append(count_p)
-                count_p = 0
-            elif count_sb == 0:
-                part += i
-                count_p += 1
-                new_operation += part
-                part = ""
+    t = []
+    t1 = [0, 1]
+    t2 = []
+    count = 0
+    for name in array_names:
+        for splt in range(1, math_operation.count(name)+1):
+            t = math_operation.split(name, splt)
+            t1[0] = name.join(t[:splt])
+            t1[1] = t[-1]
+            t = t1
+            if len(t[0]) > 0 and t[0][-1].isalpha():
+                    continue
+            elif len(t[1]) < 1:
+                continue
+            elif t[1][0] != "(":
+                continue
             else:
-                part += i
-                count_p += 1
-        elif i == ")":
-            if count_sb > 0 and count_p == 0:
-                part += "]"
-                count_sb -= 1
-                count_p = counts_p[-1]
-                counts_p.pop()
-            else:
-                part += i
-                count_p -= 1
-        elif i == "," and count_p == 0 and count_sb > 0:
-            part += "]["
-        else:
-            part += i
-    new_operation += part
-    return new_operation
+                count = 0
+                t2 = list(t[1])
+                for i in range(len(t2)):
+                    if t2[i] == "(" and count == 0:
+                        t2[i] = "["
+                        count += 1
+                    elif t2[i] in "([":
+                        count += 1
+                    elif t2[i] == ")" and count == 1:
+                        t2[i] = "]"
+                        break
+                    elif t2[i] in ")]":
+                        count -= 1
+                    elif t2[i] == "," and count == 1:
+                        t2[i] = "]["
+                t[1] = "".join(t2)
+                math_operation = t[0] + name + t[1]
+    return math_operation
 
-def operation_to_function(math_operation, op_symbol, function, operations_list):
+def operation_to_function(math_operation: str, op_symbol: str, function: str, operations_list: str, equal: str) -> str:
     while op_symbol in math_operation:
         t = math_operation.split(op_symbol, 1)
         x = ""
         count = 0
         for i in reversed(t[0]):
-            # print("X:", x, i, count)
+            if equal == "-": print("X:", x, i, count)
             if count < 0:
+                x = x[:-1]
                 break
-            if i == ")" or i == "]":
-                x += i
-                count += 1
-                continue
-            elif i == "(" or i == "[":
-                count -= 1
-                x += i
-                continue
             if i not in operations_list:
                 x += i
+                continue
             else:
-                if count != 0:
+                if i == ")" or i == "]":
                     x += i
-                else:
-                    break
+                    count += 1
+                    continue
+                elif i == "(" or i == "[" and count != 0:
+                    count -= 1
+                    x += i
+                    continue
+            if count != 0:
+                x += i
+            else:
+                break
         x = x[::-1]
         y = ""
         count = 0
         for i in t[1]:
-            # print("Y:", y, i, count)
+            if equal == "-": print("Y:", y, i, count)
             if count < 0:
                 y = y[:-1]
                 break
-            if i not in operations_list:
+            if i not in operations_list and i != equal:
                 y += i
                 continue
             else:
@@ -213,13 +210,12 @@ def operation_to_function(math_operation, op_symbol, function, operations_list):
                     count += 1
                     y += i
                     continue
-                elif i == ")" or i == "]":
+                elif i == ")" or i == "]" and count != 0:
                     count -= 1
                     y += i
                     continue
             if count != 0:
                 y += i
-                continue
             else:
                 break
         if x[0] == "[" and y[-1] == "]":
@@ -228,11 +224,17 @@ def operation_to_function(math_operation, op_symbol, function, operations_list):
         if x[0] == "(" and y[-1] == ")":
             x = x[1:]
             y = y[:-1]
-        math_operation = math_operation.replace(f"{x}{op_symbol}{y}", f"{function}({x}, {y})")
+        if x[0] == "(" and (x+y).count("(") - (x+y).count(")") != 0:
+            x = x[1:]
+        elif x[-1] == ")" and (x+y).count("(") - (x+y).count(")") != 0:
+            x = "(" + x
+        if equal == "-": print(x, y)
+        if equal == "-": print(math_operation)
+        math_operation = math_operation.replace(f"{x}{op_symbol}{y}", f"{function}({x},{y})", 1)
+        if equal == "-": print(math_operation)
     return math_operation
 
-
-def handle_doubles(math_operation, double_functions):
+def handle_doubles(math_operation: str, double_functions) -> str:
     def find_matching_paren(s, start):
         stack = []
         for i in range(start, len(s)):
@@ -253,7 +255,7 @@ def handle_doubles(math_operation, double_functions):
                 return "*((double*)" + arg[1:] + ")"
         return arg
 
-    def transform_recursive(s):
+    def transform_recursive(s: str) -> str:
         i = 0
         while i < len(s):
             for func in double_functions:
@@ -310,22 +312,23 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     loop_labels = []
     used_variables = []
     user_functions = []
-    loops_wol = 0
-    last_label = "POCZ"
+    loops_wol: int = 0
+    last_label: str = "POCZ"
     keys = [0] * 36
     keys = str(keys).replace("[", "{").replace("]", "}")
     restricted_eval = {"__builtins__": None}
 
     # Add necessary C lines
-    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n#include <errno.h>\n#include <float.h>\n#include <stdarg.h>\n#include <stdint.h>\n\n")
+    output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n#include <errno.h>\n#include <float.h>\n#include <stdarg.h>\n#include <stdint.h>\n#include <limits.h>\n\n")
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }), float: ({ float sum = 0; for (int X = (Y); X > 0; X--) sum += (Z); sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }), float: ({ float iln = 1; for (int X = (Y); X > 0; X--) iln = iln * (Z); iln; }))\n")
     output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : 1))\n")
-    output_file.write("#define div(num, num2) (_Generic((num) / (num2), int: (int)((num) / (num2)), float: (int)floor((num) / (num2))))\n")
+    output_file.write("#define div(num, num2) ((int)floor(divide(num, num2)))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
     output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
     output_file.write("#define sako_abs(X) _Generic((X), int: abs, float: fabsf)(X)\n")
-    output_file.write("#define sako_mod(X, Y) _Generic((X) + (Y), int: (int)fmodf((float)(X), (float)(Y)), float: fmodf((float)(X), (float)(Y)))\n")
+    output_file.write("#define sako_mod(X, Y) ((nadmiar = ((Y) == 0 ? 1 : nadmiar)), ((Y) == 0 ? 0 : _Generic(((X)+(Y)), float: fmodf((float)(X), (float)(Y)), default: ((int)(X) % (int)(Y)))))\n")
+    output_file.write("#define ent(X) ((nadmiar = ((X) > INT_MAX ? 1 : nadmiar)), (int)floor(X))\n")
 
     # Add macros and functions for double numbers
     output_file.write("#define GET_MACRO(_1,_2,_3,NAME,...) NAME\n")
@@ -362,6 +365,16 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
 
     # NADMIAR functions and variable
     output_file.write("int8_t nadmiar = 0;\n")
+    output_file.write("#define add(a, b) _Generic((a), int: _Generic((b), int: add_int, default: add_float), default: add_float)(a, b)\n")
+    output_file.write("#define subtract(a, b) _Generic((a), int: _Generic((b), int: subtract_int, default: subtract_float), default: subtract_float)(a, b)\n")
+    output_file.write("#define multiply(a, b) _Generic((a), int: _Generic((b), int: multiply_int, default: multiply_float), default: multiply_float)(a, b)\n")
+    output_file.write("int add_int(int n1, int n2) { if (n2 > INT_MAX - n1 || -n2 < n1 - INT_MIN) { nadmiar = 1; } return n1+n2; }\n")
+    output_file.write("float add_float(float n1, float n2) { if ((n1 > 0 && n2 > 0 && (n1 > FLT_MAX - n2)) || (n1 < 0 && n2 < 0 && (n1 < -FLT_MAX - n2))) { nadmiar = 1; } return n1+n2; }\n")
+    output_file.write("int subtract_int(int n1, int n2) { if ((n2 > 0 && n1 < INT_MIN + n2) || (n2 < 0 && n1 > INT_MAX + n2)) { nadmiar = 1; } return n1-n2; }\n")
+    output_file.write("float subtract_float(float n1, float n2) { if ((n2 > 0 && n1 < -FLT_MAX + n2) || (n2 < 0 && n1 > FLT_MAX + n2)) { nadmiar = 1; } return n1-n2; }\n")
+    output_file.write("int multiply_int(int n1, int n2) { int result = n1*n2; if ((n1 != 0 && n2 != 0 && result / n2 != n1) || ((n1 > 0 && n2 < 0 && result > 0) || (n1 < 0 && n2 > 0 && result > 0))) { nadmiar = 1; } return result; }\n")
+    output_file.write("float multiply_float(float n1, float n2) { float result = n1*n2; if ((n1 != 0 && n2 != 0 && result / n2 != n1) || ((n1 > 0 && n2 < 0 && result > 0) || (n1 < 0 && n2 > 0 && result > 0))) { nadmiar = 1; } return result; }\n")
+    output_file.write("float divide(float n1, float n2) { float result = n1 / n2; if (n2 == 0) { nadmiar = 0; } if (fabs(result) > FLT_MAX) { nadmiar = 1; } return result; }\n\n")
 
     # Global variables
     output_file.write(f"int keys[] = {keys}; int opt;\n")
@@ -389,8 +402,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_SW = False
     moved_List_SW_index = -1
 
-    zline_zindex = 48
-    error_line_index = 0
+    zline_zindex: int = 61
+    error_line_index: int = 0
     for line in input_file:
         # Debug lines
         #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
