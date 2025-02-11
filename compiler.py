@@ -143,7 +143,7 @@ def handle_square_brackets(math_operation: str) -> str:
             t1[1] = t[-1]
             t = t1
             if len(t[0]) > 0 and t[0][-1].isalpha():
-                    continue
+                continue
             elif len(t[1]) < 1:
                 continue
             elif t[1][0] != "(":
@@ -390,7 +390,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     tek_wie2 = False
     inside_TABLICA = False
 
-    moved_List_B = False
+    moved_List_B = -1
     moved_List_CZ = False
     moved_List_DR = False
     moved_List_DRW = False
@@ -406,8 +406,8 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     error_line_index: int = 0
     for line in input_file:
         # Debug lines
-        #if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
-        #print(integers)
+        # if line.replace("\n", "").replace(" ", "") != "": print(line.replace("\n", ""), zline_zindex)
+        # print(integers)
 
         ###################################
         # Preparation for line processing #
@@ -438,7 +438,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
         # LABELS #
         ##########
         if (line[0].isdigit() or line[0] == "*") and (not inside_TEKST and not inside_TABLICA and not jezyk_SAS
-                and not moved_List_SW and not moved_List_DR and not moved_List_PnB):
+                and not moved_List_SW and not moved_List_DR and not moved_List_PnB and not moved_List_CZ and not ("-" in integers)):
             t = ""
             t2 = 0
             for z, i in enumerate(line):
@@ -548,19 +548,19 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             integers.extend(line)
             zline_zindex -= 1
             continue
-        elif moved_List_B:
+        elif moved_List_B != -1:
             line = line.split(",")
             for z, i in enumerate(line):
                 if i != "-":
                     is_float = "float" * (f"*{i}" not in integers) + "int" * (f"*{i}" in integers)
                     used_variables.append(i)
-                    output_file.write(f"    {is_float} {i}[{int(line[0])+1}];\n")
-                    moved_List_B = False
+                    array_names.append(i)
+                    output_file.write(f"    {is_float} {i}[{moved_List_B}];\n")
                     if z != 0:
                         zline_zindex += 1
                 else:
-                    moved_List_B = True
                     break
+            moved_List_B = -1
             continue
         elif moved_List_DR:
             t = line
@@ -983,7 +983,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     if z != 0:
                         zline_zindex += 1
                 else:
-                    moved_List_B = True
+                    moved_List_B = int(line[1:-1])
                     break
             continue
 
@@ -1669,29 +1669,29 @@ def main():
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Compile SAKO to C.")
     parser.add_argument('input_filename',
-            help='Name of the input file')
+            help='name of the input file')
     parser.add_argument('-en', '--encoding', metavar='{KW6|ASCII|Ferranti}', default='',
-            help='Specify the encoding flag used to process strings.')
+            help='specify the encoding flag used to process strings')
     parser.add_argument('-d', '--debug', action='store_true',
-            help='Turn off removing temporary C file after compilation.')
+            help='don\'t remove temporary C file after compilation')
     parser.add_argument('-Wall', '--all-warnings', action='store_true',
-            help='Turn on -Wall flag while compiling to binary.')
+            help='turn on -Wall flag while compiling to binary')
     parser.add_argument('-g', action='store_true',
-            help='Turn on -g flag while compiling to binary.')
+            help='turn on -g flag while compiling to binary')
     parser.add_argument('-nc', '--no-compiling', action='store_true',
-            help='Turn off compiling C code.')
+            help='don\'t compile C code to binary')
     parser.add_argument('-es', '--eliminate-stop', action='store_true',
-            help='Change STOP command to wait for input and restart from the given label, instead of stopping the programme.')
+            help='change STOP command to wait for input and restart from the given label, instead of stopping the programme')
     parser.add_argument('-ot', '--optional-translation', action='store_true',
-            help='Turn on compiling optional commands.')
+            help='compile optional commands')
     parser.add_argument('-dl', '--drum-location', metavar='drum_file', default='drum.txt',
-            help='Specify the location of the drum file.')
+            help='specify the location of the drum file')
     parser.add_argument('-o', '--output', metavar='output_file', default='',
-            help='Specify the name of the output file.')
+            help='specify the name of the output file')
     parser.add_argument('-co', '--compiler', metavar='{GCC|TCC}', default='GCC',
-            help='Specify compiler used when compiling to binary file.')
+            help='specify compiler used when compiling to binary file')
     parser.add_argument('-f', '--flags', metavar='"flags"', default='',
-            help='Specify compiler flags used when compiling to binary file.')
+            help='specify compiler flags used when compiling to binary file')
 
     # Parse the command-line arguments
     args = parser.parse_args()
