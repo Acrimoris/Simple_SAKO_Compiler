@@ -4,9 +4,11 @@
  * When updating those functions contributor must edit this file together with the oneliner in compiler.py
  **/
 
-// Reference:
-// System_Automatycznego_KOdowania_SAKO_(Biuro_Projektow_Przemyslu_Syntezy_Chemicznej-Pracownia_Techniki_Obliczeniowej-Gliwice)
-// Page 306 (314)
+/**
+ * Reference:
+ * System_Automatycznego_KOdowania_SAKO_(Biuro_Projektow_Przemyslu_Syntezy_Chemicznej-Pracownia_Techniki_Obliczeniowej-Gliwice)
+ * Page 306 (314)
+ **/
 
 #include <stdio.h>
 #include <stdlib.h>
