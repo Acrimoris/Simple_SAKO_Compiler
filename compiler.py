@@ -759,6 +759,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
             variable = line.split("=")[0]
             line = line.split("=")[1]
             operations_list = "+-/×⋄*"
+            functions_list = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC", "DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"] + user_functions
             count = 0
             t = []
             t2 = []
@@ -770,11 +771,19 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                     if count == 0:
                         t.append(z)
             for i in reversed(t):
-                if i < len(line) - 1 and line[i+1] not in operations_list:
-                    t2.append(line[:i])
-                    t2.append(line[i:])
-            line = t2[0]
-            end = t2[1][1:]
+                count = 0
+                for z in reversed(range(len(line[:i+1]))):
+                    if line[z] == ")":
+                        count += 1
+                    elif line[z] == "(":
+                        count -= 1
+                        if count == 0 and line[z-1] not in operations_list:
+                            if line[z-3:z] not in functions_list:
+                                t2.append(line[:i])
+                                t2.append(line[i:])
+                            break
+            line = t2[-2]
+            end = t2[-1][1:]
             count = 0
             t = []
             for z, i in reversed(list(enumerate(line))):
