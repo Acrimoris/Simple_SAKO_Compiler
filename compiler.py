@@ -20,7 +20,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
     # Also finally finish CCC
     # And make ELM work with float arrays
     SAKO_functions = ["SIN", "COS", "TG", "ASN", "ACS", "ATG", "ARC", "PWK", "PWS", "LN", "EXP", "MAX", "MIN", "MOD", "SGN", "ABS", "ENT", "DIV", "SUM", "ILN", "ELM", "ADR", "CCC"]
-    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmax", "fmin", "sako_mod", "sgn", "sako_abs", "ent", "div", "sum", "iln", "elm", "*&", "read_int"]
+    C_functions = ["sin", "cos", "tan", "asin", "acos", "atan", "arcus", "sqrt", "cbrt", "log", "exp", "fmaxf", "fminf", "sako_mod", "sgn", "sako_abs", "ent", "div", "sum", "iln", "elm", "*&", "read_int"]
     double_functions = ["DOD", "ODD", "MND", "DZD", "ABD", "IDK", "IKD"]
     read_double = "CZD"
     print_double = "DRD"
@@ -1271,7 +1271,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 if encoding != "ASCII":
                     output_file.write(f"       {i}[i] = encoding[(int)input[0]];\n")
                 else:
-                    zline_zindex -= 1
+                    output_file.write(f"       {i}[i] = input[0];\n")
                 output_file.write("       if (input[0] == '\\n') { break; }\n")
                 output_file.write("    }\n")
                 zline_zindex += 5
