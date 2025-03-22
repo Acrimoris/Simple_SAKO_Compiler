@@ -322,7 +322,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("#include <stdio.h>\n#include <math.h>\n#include <stdlib.h>\n#include <string.h>\n#include <ctype.h>\n#include <unistd.h>\n#include <errno.h>\n#include <float.h>\n#include <stdarg.h>\n#include <stdint.h>\n#include <limits.h>\n\n")
     output_file.write("#define sum(X, Y, Z) _Generic((Z), int: ({ int sum = 0; for (int X = (Y); X >= 0; --X) sum += (Z); sum; }), default: ({ float sum = 0; for (int X = (Y); X >= 0; X--) sum += (Z); sum; }))\n")
     output_file.write("#define iln(X, Y, Z) _Generic((Z), int: ({ int iln = 1; for (int X = (Y); X >= 0; --X) iln = iln * (Z); iln; }), default: ({ float iln = 1; for (int X = (Y); X >= 0; X--) iln = iln * (Z); iln; }))\n")
-    output_file.write("#define sgn(X, Y) (((sizeof(X) == sizeof(int)) ? abs(X) : fabsf(X)) * ((Y < 0) ? -1 : (Y == 0) ? 0 : 1))\n")
+    output_file.write("#define sgn(X, Y) (_Generic((X), int: (int)(abs(X)*((Y < 0) ? -1 : ((Y == 0) ? 0 : 1))), default: (float)(fabsf(X)*((Y < 0) ? -1 : ((Y == 0) ? 0 : 1)))))\n")
     output_file.write("#define div(num, num2) ((int)floor(divide(num, num2)))\n")
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
     output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
