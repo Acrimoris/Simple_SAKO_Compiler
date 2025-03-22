@@ -218,13 +218,13 @@ def operation_to_function(math_operation: str, op_symbol: str, function: str, op
                 y += i
             else:
                 break
-        if x[0] == "[" and y[-1] == "]" and (x.count("[")-x.count("]") != 0 or x.count("[")-x.count("]") != 0):
+        if x[0] == "[" and y[-1] == "]" and (x.count("[")-x.count("]") != 0 or y.count("[")-y.count("]") != 0):
             x = x[1:]
             y = y[:-1]
-        if x[0] == "(" and y[-1] == ")" and (x.count("(")-x.count(")") != 0 or x.count("(")-x.count(")") != 0):
+        if x[0] == "(" and y[-1] == ")" and (x.count("(")-x.count(")") != 0 or y.count("(")-y.count(")") != 0):
             x = x[1:]
             y = y[:-1]
-        if x[0] == "(" and (x+y).count("(") - (x+y).count(")") != 0:
+        if x[0] == "(" and (x+y).count("(")-(x+y).count(")") != 0 and x.count("(")-x.count(")") != 0:
             x = x[1:]
         elif x[-1] == ")" and (x+y).count("(") - (x+y).count(")") != 0:
             x = "(" + x
