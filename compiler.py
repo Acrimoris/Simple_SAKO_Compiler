@@ -83,7 +83,7 @@ def process_math_operation(math_operation: str, user_functions=[]) -> str:
 
     # Handle "to the power of" operations
     operations_list="()×-+/[],="
-    math_operation = operation_to_function(math_operation, "$", "pow", "()×-+/[],=", "")
+    math_operation = operation_to_function(math_operation, "$", "sako_pow", "()×-+/[],=", "")
     #math_operation = operation_to_function(math_operation, "×", "multiply", "()-+[],=", "/")
     #math_operation = operation_to_function(math_operation, "/", "divide", "()-+[],=", "")
     #math_operation = operation_to_function(math_operation, "+", "add", "()[],=", "-")
@@ -327,8 +327,9 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     output_file.write("#define elm(arr) ((int)(sizeof(arr) / sizeof(int)))\n")
     output_file.write("#define arcus(X, Y) (atan2f((Y), (X)) < 0 ? atan2f((Y), (X)) + 2 * M_PI : atan2f((Y), (X)))\n")
     output_file.write("#define sako_abs(X) _Generic((X), int: abs, default: fabsf)(X)\n")
-    output_file.write("#define sako_mod(X, Y) ((nadmiar = ((Y) == 0 ? 1 : nadmiar)), ((Y) == 0 ? 0 : ((int)(X) % (int)(Y))))\n")
+    output_file.write("#define sako_mod(X, Y) ((int)((nadmiar = ((Y) == 0 ? 1 : nadmiar)), ((Y) == 0 ? 0 : ((int)(X) % (int)(Y)))))\n")
     output_file.write("#define ent(X) ((nadmiar = ((X) > INT_MAX ? 1 : nadmiar)), (int)floor(X))\n")
+    output_file.write("#define sako_pow(X, Y) _Generic((X), int: _Generic((Y), int: (int)pow(X, Y), default: (float)pow(X, Y)), default: (float)pow(X, Y))\n")
 
     # Add macros and functions for double numbers
     output_file.write("#define GET_MACRO(_1,_2,_3,NAME,...) NAME\n")
@@ -402,7 +403,7 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
     moved_List_SW = False
     moved_List_SW_index = -1
 
-    zline_zindex: int = 61
+    zline_zindex: int = 62
     error_line_index: int = 0
     for line in input_file:
         # Debug lines
@@ -1101,10 +1102,14 @@ def compile(input_file, output_file, encoding, eliminate_stop, optional_commands
                 newlines_c = True
             if newlines_c == True:
                 t = process_math_operation(line)
-                output_file.write("    for (int i = 0; i < " + str(t) +"; ++i) {\n")
-                output_file.write("        putchar('\\n');\n")
-                output_file.write("    }\n")
-                zline_zindex += 2
+                output_file.write(f"    opt = {t};\n")
+                output_file.write("    if (opt == 0) {\n")
+                output_file.write("        putchar('\\r');\n")
+                output_file.write("    } else {\n")
+                output_file.write("        for (int i = 0; i < opt; ++i) {\n")
+                output_file.write("            putchar('\\n');\n")
+                output_file.write("        }}\n")
+                zline_zindex += 6
             else:
                 output_file.write("    putchar('\\n');\n")
             continue
